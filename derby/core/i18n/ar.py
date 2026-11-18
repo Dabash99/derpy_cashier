@@ -36,6 +36,7 @@ ALREADY_RUNNING_MESSAGE = "البرنامج مفتوح بالفعل على هذ�
 SIDEBAR_MENU = "المنيو"
 SIDEBAR_CASHIER = "الكاشير"
 SIDEBAR_TABLES = "الترابيزات"
+SIDEBAR_SALES_LOG = "سجل المبيعات"
 SIDEBAR_PLAYSTATION = "البلاي ستيشن"
 SIDEBAR_EXPENSES = "المصروفات"
 SIDEBAR_REPORTS = "التقارير"

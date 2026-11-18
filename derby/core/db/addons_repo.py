@@ -68,6 +68,10 @@ def _next_addon_sort_order(conn: sqlite3.Connection, group_id: int) -> int:
     return (row["max_order"] or 0) + 1
 
 
+def get_addon(conn: sqlite3.Connection, addon_id: int) -> Optional[sqlite3.Row]:
+    return conn.execute("SELECT * FROM addons WHERE id = ?", (addon_id,)).fetchone()
+
+
 def create_addon(conn: sqlite3.Connection, group_id: int, name: str, price_delta_piasters: int) -> int:
     sort_order = _next_addon_sort_order(conn, group_id)
     cursor = conn.execute(

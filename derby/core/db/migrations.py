@@ -118,9 +118,112 @@ def _migration_0002_menu(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0003_cashier(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tables (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            invoice_no INTEGER,
+            table_id INTEGER,
+            device_id INTEGER,  -- Phase 4: PlayStation device, unused for now
+            status TEXT NOT NULL CHECK (status IN ('open', 'paid', 'cancelled', 'void')),
+            opened_at_utc TEXT NOT NULL,
+            opened_by INTEGER NOT NULL,
+            paid_at_utc TEXT,
+            paid_by INTEGER,
+            business_date TEXT,
+            subtotal_piasters INTEGER NOT NULL DEFAULT 0,
+            discount_piasters INTEGER NOT NULL DEFAULT 0,
+            discount_reason TEXT,
+            discount_approved_by INTEGER,
+            total_piasters INTEGER NOT NULL DEFAULT 0,
+            payment_method TEXT CHECK (payment_method IN ('cash', 'instapay')),
+            voided_at_utc TEXT,
+            voided_by INTEGER,
+            void_reason TEXT,
+            note TEXT,
+            FOREIGN KEY (table_id) REFERENCES tables (id),
+            FOREIGN KEY (opened_by) REFERENCES users (id),
+            FOREIGN KEY (paid_by) REFERENCES users (id),
+            FOREIGN KEY (discount_approved_by) REFERENCES users (id),
+            FOREIGN KEY (voided_by) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('product', 'ps_time')),
+            product_id INTEGER,
+            name_snapshot TEXT NOT NULL,
+            unit_price_snapshot_piasters INTEGER NOT NULL,
+            qty INTEGER NOT NULL CHECK (qty BETWEEN 1 AND 99),
+            line_total_piasters INTEGER NOT NULL,
+            note TEXT,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (order_id) REFERENCES orders (id),
+            FOREIGN KEY (product_id) REFERENCES products (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS order_item_addons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_item_id INTEGER NOT NULL,
+            addon_id INTEGER,
+            name_snapshot TEXT NOT NULL,
+            price_delta_snapshot_piasters INTEGER NOT NULL,
+            FOREIGN KEY (order_item_id) REFERENCES order_items (id),
+            FOREIGN KEY (addon_id) REFERENCES addons (id)
+        )
+        """
+    )
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_business_date ON orders (business_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_table_status ON orders (table_id, status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items (order_id)")
+
+    # Belt-and-braces at the DB level (the service layer also checks this
+    # before inserting): only one OPEN order per table at a time.
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_one_open_per_table "
+        "ON orders (table_id) WHERE status = 'open' AND table_id IS NOT NULL"
+    )
+    # Invoice numbers must never repeat once assigned.
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_invoice_no "
+        "ON orders (invoice_no) WHERE invoice_no IS NOT NULL"
+    )
+
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES ('next_invoice_no', '1') "
+        "ON CONFLICT(key) DO NOTHING"
+    )
+
+    for sort_order, name in enumerate(["ترابيزة 1", "ترابيزة 2", "ترابيزة 3"], start=1):
+        conn.execute(
+            "INSERT INTO tables (name, sort_order, is_active) VALUES (?, ?, 1)", (name, sort_order)
+        )
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
+    _migration_0003_cashier,
 ]
 
 

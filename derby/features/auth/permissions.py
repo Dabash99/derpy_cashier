@@ -12,12 +12,37 @@ def can_manage_menu(role: str) -> bool:
     return role == ROLE_OWNER
 
 
-def can_access_pos(role: str) -> bool:
+def use_pos(role: str) -> bool:
     return role in (ROLE_OWNER, ROLE_CASHIER)
 
 
-def can_access_tables(role: str) -> bool:
+def view_tables(role: str) -> bool:
     return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def manage_tables(role: str) -> bool:
+    """Add/rename/reorder/disable tables -- owner only."""
+    return role == ROLE_OWNER
+
+
+def apply_discount_direct(role: str) -> bool:
+    """Owner can apply a discount directly; a cashier always needs an
+    owner's PIN approval (see orders_service.apply_discount)."""
+    return role == ROLE_OWNER
+
+
+def void_paid_order(role: str) -> bool:
+    return role == ROLE_OWNER
+
+
+def view_sales_today(role: str) -> bool:
+    """Both roles can open the sales log; a cashier is restricted to the
+    current business date inside the screen itself."""
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def view_sales_all_dates(role: str) -> bool:
+    return role == ROLE_OWNER
 
 
 def can_access_playstation(role: str) -> bool:

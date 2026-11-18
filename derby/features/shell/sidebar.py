@@ -10,9 +10,10 @@ from derby.features.auth import permissions
 # (key, label, phase-if-not-built-yet, permission check)
 SECTIONS = [
     ("menu", ar.SIDEBAR_MENU, None, permissions.can_manage_menu),
-    ("pos", ar.SIDEBAR_CASHIER, 3, permissions.can_access_pos),
-    ("tables", ar.SIDEBAR_TABLES, 4, permissions.can_access_tables),
-    ("playstation", ar.SIDEBAR_PLAYSTATION, 5, permissions.can_access_playstation),
+    ("pos", ar.SIDEBAR_CASHIER, None, permissions.use_pos),
+    ("tables", ar.SIDEBAR_TABLES, None, permissions.view_tables),
+    ("sales_log", ar.SIDEBAR_SALES_LOG, None, permissions.view_sales_today),
+    ("playstation", ar.SIDEBAR_PLAYSTATION, 4, permissions.can_access_playstation),
     ("expenses", ar.SIDEBAR_EXPENSES, 6, permissions.can_access_expenses),
     ("reports", ar.SIDEBAR_REPORTS, 7, permissions.can_access_reports),
     ("settings", ar.SIDEBAR_SETTINGS, None, permissions.can_access_settings),
