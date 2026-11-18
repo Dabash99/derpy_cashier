@@ -96,6 +96,11 @@ Lint:
 .venv\Scripts\python.exe -m ruff check .
 ```
 
+## Backups
+
+Backups (Phase 7) must include the images folder `%APPDATA%\Derby\images`
+alongside the database file — product photos live on disk, not in SQLite.
+
 ## Windows 7 requirements (for the machine running Derby)
 
 - Windows 7 **Service Pack 1**, 64-bit.

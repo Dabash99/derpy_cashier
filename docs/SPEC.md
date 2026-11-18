@@ -59,19 +59,26 @@ discussion history — just the decisions that shape the build.
 
 ## Phases
 
-1. **Foundation** (this phase) — project scaffold, SQLite + migrations,
-   PIN auth with lockout, roles/permissions, settings screen, main window
-   shell with placeholders, the manual update-check feature, and the full
+1. **Foundation** (done) — project scaffold, SQLite + migrations, PIN auth
+   with lockout, roles/permissions, settings screen, main window shell
+   with placeholders, the manual update-check feature, and the full
    test/policy suite.
-2. Menu management (items, categories, prices).
-3. Cashier / POS screen (orders, line items, payment method).
-4. Tables (if dine-in table tracking is needed) — TBD scope.
-5. PlayStation corner (devices, sessions, billing per the rule above).
-6. Expenses tracking.
-7. Reports (sales, expenses, PlayStation usage, by business day).
-8. Daily closing + backup (to the configured primary/secondary folders)
-   + WhatsApp report send (manual, via `whatsapp_number` setting — exact
-   send mechanism TBD in that phase; Phase 1 only stores the number).
+2. **Menu** (this phase) — categories, products, add-ons, CSV import/export,
+   product images.
+3. Cashier & tables — cart, add-ons, 3 tables that can be added/disabled,
+   discounts with permission + audit log, payment cash/InstaPay, sales log.
+4. PlayStation — 2 devices (more can be added), Single/Multi hourly rates,
+   timed sessions, a session becomes an order line, changing Single/Multi
+   stops and starts a new session on the same order, transferring the bill
+   table↔device is rejected if the target is busy, timers are computed
+   from a UTC `started_at` so they survive an app restart.
+5. Printing — deferred; no printer integration yet.
+6. Expenses, reports, profit, export to Excel/CSV/PDF.
+7. Daily closing + backup (to the configured primary/secondary folders,
+   including the `images` folder) + WhatsApp report send (manual, via
+   `whatsapp_number` setting).
+8. Delivery — PyInstaller exe for Windows 7/10, installer, real-PC tests,
+   a short user guide.
 
-Each phase builds directly on Phase 1's schema and conventions rather than
-replacing them.
+Each phase builds directly on the previous phases' schema and conventions
+rather than replacing them.
