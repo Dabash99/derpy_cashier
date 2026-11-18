@@ -35,3 +35,9 @@ def default_backup_dir() -> Path:
     """Default primary backup folder: Documents\\Derby\\Backups."""
     documents = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Documents"
     return documents / APP_FOLDER_NAME / "Backups"
+
+
+def default_export_dir() -> Path:
+    """Default folder for report/expenses/sales-log exports: Documents\\Derby\\Exports."""
+    documents = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Documents"
+    return documents / APP_FOLDER_NAME / "Exports"

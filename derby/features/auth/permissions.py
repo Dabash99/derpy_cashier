@@ -58,7 +58,22 @@ def can_access_expenses(role: str) -> bool:
     return role == ROLE_OWNER
 
 
+def manage_expenses(role: str) -> bool:
+    """Create/void/replace expenses and manage recurring templates and
+    expense categories -- same owner-only gate as can_access_expenses,
+    kept as a separate name since the spec calls for it explicitly."""
+    return role == ROLE_OWNER
+
+
 def can_access_reports(role: str) -> bool:
+    return role == ROLE_OWNER
+
+
+def view_reports(role: str) -> bool:
+    return role == ROLE_OWNER
+
+
+def export_data(role: str) -> bool:
     return role == ROLE_OWNER
 
 
