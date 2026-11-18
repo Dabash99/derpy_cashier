@@ -28,6 +28,16 @@ def format_egp(piasters: int) -> str:
     return "{0} ج.م".format(piasters_to_plain_text(piasters))
 
 
+def piasters_to_egp_float(piasters: int) -> float:
+    """A float EGP value for a numeric spreadsheet cell -- export-only.
+
+    Never use this for money arithmetic (hence no symmetric "parse" here):
+    it is a one-way, one-time conversion for writing a numeric xlsx cell
+    that Excel can SUM(), not a value this app does further math on.
+    """
+    return piasters / 100.0
+
+
 def parse_egp_input(text: str) -> int:
     """Parse a user-typed EGP amount (e.g. "12.5", "12,5", "12") to piasters.
 
