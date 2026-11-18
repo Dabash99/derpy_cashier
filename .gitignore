@@ -12,3 +12,7 @@ dist/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Real cafe data (menu.csv + photos) -- not committed automatically;
+# the owner decides if/how this goes into version control.
+/menu/
