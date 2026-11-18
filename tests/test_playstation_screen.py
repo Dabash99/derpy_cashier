@@ -106,6 +106,42 @@ def test_device_management_panel_cannot_disable_busy_device(qapp, db_conn):
     assert ps_devices_repo.get_device(db_conn, device["id"])["is_active"] == 1
 
 
+def test_adjust_start_dialog_owner_direct(qapp, db_conn):
+    from derby.core.utils.time_utils import to_cairo
+    from derby.features.playstation.ps_adjust_start_dialog import PsAdjustStartDialog
+
+    owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
+    owner = users_repo.get_user(db_conn, owner_id)
+    device = ps_devices_repo.list_devices(db_conn)[0]
+    ps_devices_repo.set_rates(db_conn, device["id"], 4000, 6000)
+    t0 = utc_now() - timedelta(hours=1)  # started an hour ago, so backdating 10 more minutes is safely in range
+    ps_service.start_session(db_conn, device["id"], "single", owner_id, now=t0)
+
+    dialog = PsAdjustStartDialog(db_conn, device["id"], owner, parent=None)
+    new_cairo = to_cairo(t0 - timedelta(minutes=10))
+    dialog._time_input.setText(new_cairo.strftime("%H:%M"))
+    dialog._on_save()
+    assert dialog.result() == dialog.Accepted
+
+
+def test_adjust_start_dialog_rejects_a_future_time(qapp, db_conn):
+    from derby.core.utils.time_utils import to_cairo
+    from derby.features.playstation.ps_adjust_start_dialog import PsAdjustStartDialog
+
+    owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
+    owner = users_repo.get_user(db_conn, owner_id)
+    device = ps_devices_repo.list_devices(db_conn)[0]
+    ps_devices_repo.set_rates(db_conn, device["id"], 4000, 6000)
+    t0 = utc_now()
+    ps_service.start_session(db_conn, device["id"], "single", owner_id, now=t0)
+
+    dialog = PsAdjustStartDialog(db_conn, device["id"], owner, parent=None)
+    dialog._time_input.setText(to_cairo(t0 + timedelta(minutes=5)).strftime("%H:%M"))
+    dialog._on_save()
+    assert dialog.result() != dialog.Accepted
+    assert dialog._error_label.text() != ""
+
+
 def test_full_gui_flow_session_plus_drink_then_pay(qapp, db_conn):
     """Start Single -> advance the fake clock 37 min -> stop -> drink added
     -> pay cash -> on-screen invoice shows both the PS line and the drink."""

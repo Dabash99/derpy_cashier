@@ -26,6 +26,7 @@ from derby.core.i18n import ar
 from derby.core.utils.money import format_egp
 from derby.features.auth import permissions
 from derby.features.playstation import ps_service
+from derby.features.playstation.ps_adjust_start_dialog import PsAdjustStartDialog
 from derby.features.playstation.ps_device_management_panel import PsDeviceManagementPanel
 from derby.features.pos.exceptions import DeviceRateNotSetError, SessionRunningError
 from derby.features.tables.move_order_dialog import MoveOrderDialog
@@ -73,6 +74,9 @@ class _DeviceCard(QFrame):
         self._stop_button = QPushButton(ar.PS_STOP_BUTTON)
         self._stop_button.clicked.connect(self._on_stop)
         row1.addWidget(self._stop_button)
+        self._adjust_start_button = QPushButton(ar.PS_ADJUST_START_TITLE)
+        self._adjust_start_button.clicked.connect(self._on_adjust_start)
+        row1.addWidget(self._adjust_start_button)
         layout.addLayout(row1)
 
         row2 = QHBoxLayout()
@@ -141,6 +145,7 @@ class _DeviceCard(QFrame):
         self._start_multi_button.setVisible(start)
         self._switch_button.setVisible(switch)
         self._stop_button.setVisible(stop)
+        self._adjust_start_button.setVisible(stop)  # only meaningful while a session is running
         self._open_invoice_button.setVisible(open_invoice)
         self._move_button.setVisible(move)
 
@@ -172,6 +177,11 @@ class _DeviceCard(QFrame):
         ps_service.stop_session(self._conn, self._device_id, self._user["id"])
         self.refresh()
         self.state_changed.emit()
+
+    def _on_adjust_start(self) -> None:
+        dialog = PsAdjustStartDialog(self._conn, self._device_id, self._user, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.refresh()
 
     def _on_open_invoice(self) -> None:
         order = orders_repo.get_open_order_for_device(self._conn, self._device_id)
