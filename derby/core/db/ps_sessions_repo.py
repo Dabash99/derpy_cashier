@@ -113,6 +113,11 @@ def update_start_time(conn: sqlite3.Connection, session_id: int, new_started_at_
         conn.commit()
 
 
+def count_running_sessions(conn: sqlite3.Connection) -> int:
+    row = conn.execute("SELECT COUNT(*) AS n FROM ps_sessions WHERE stopped_at_utc IS NULL").fetchone()
+    return row["n"]
+
+
 def list_stopped_sessions_without_order_item(conn: sqlite3.Connection) -> List[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM ps_sessions WHERE stopped_at_utc IS NOT NULL AND order_item_id IS NULL ORDER BY id"
