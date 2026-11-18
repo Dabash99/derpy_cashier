@@ -21,6 +21,7 @@ from derby.core.theme.stylesheet import build_stylesheet
 from derby.core.utils.single_instance import SingleInstanceGuard
 from derby.features.auth.login_screen import LoginScreen
 from derby.features.auth.setup_screen import SetupScreen
+from derby.features.playstation.ps_service import run_startup_consistency_check
 from derby.features.shell.idle_filter import IdleTimer
 from derby.features.shell.main_window import MainWindow
 
@@ -89,6 +90,7 @@ def main() -> int:
     conn = connect()
     run_pending_migrations(conn)
     settings_repo.ensure_defaults(conn)
+    run_startup_consistency_check(conn)  # repairs any PlayStation session stopped mid-crash; logs each repair
 
     controller = AppController(app, conn)
     app.derby_controller = controller  # keep a strong reference alive for the app's lifetime

@@ -8,7 +8,7 @@ import sqlite3
 
 from PySide2.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout
 
-from derby.core.db import orders_repo, settings_repo, tables_repo, users_repo
+from derby.core.db import orders_repo, ps_devices_repo, settings_repo, tables_repo, users_repo
 from derby.core.i18n import ar
 from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo
@@ -52,6 +52,10 @@ class InvoiceDialog(QDialog):
             table = tables_repo.get_table(self._conn, order["table_id"])
             table_name = table["name"] if table is not None else "-"
             layout.addWidget(QLabel("{0}: {1}".format(ar.INVOICE_TABLE_LABEL, table_name)))
+        elif order["device_id"]:
+            device = ps_devices_repo.get_device(self._conn, order["device_id"])
+            device_name = device["name"] if device is not None else "-"
+            layout.addWidget(QLabel("{0}: {1}".format(ar.INVOICE_DEVICE_LABEL, device_name)))
         else:
             layout.addWidget(QLabel(ar.INVOICE_TAKEAWAY_LABEL))
 

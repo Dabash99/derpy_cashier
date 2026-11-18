@@ -12,6 +12,7 @@ from derby.core.i18n import ar
 from derby.core.utils.money import format_egp
 from derby.features.menu.price_parsing import parse_product_price
 from derby.features.pos import orders_service
+from derby.features.pos.exceptions import SessionRunningError
 
 
 class PaymentDialog(QDialog):
@@ -70,5 +71,9 @@ class PaymentDialog(QDialog):
         self._change_label.setText("{0}: {1}".format(ar.PAYMENT_CHANGE_LABEL, format_egp(max(0, change))))
 
     def _on_pay(self, method: str) -> None:
-        self.paid_order = orders_service.pay(self._conn, self._order["id"], method, self._requesting_user)
+        try:
+            self.paid_order = orders_service.pay(self._conn, self._order["id"], method, self._requesting_user)
+        except SessionRunningError:
+            self._error_label.setText(ar.PS_ERROR_SESSION_RUNNING)
+            return
         self.accept()

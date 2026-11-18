@@ -22,7 +22,7 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
-from derby.core.db import orders_repo, settings_repo, tables_repo, users_repo
+from derby.core.db import orders_repo, ps_devices_repo, settings_repo, tables_repo, users_repo
 from derby.core.i18n import ar
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.money import format_egp
@@ -141,6 +141,9 @@ class SalesLogScreen(QWidget):
         if order["table_id"]:
             table = tables_repo.get_table(self._conn, order["table_id"])
             table_text = table["name"] if table is not None else ""
+        elif order["device_id"]:
+            device = ps_devices_repo.get_device(self._conn, order["device_id"])
+            table_text = device["name"] if device is not None else ""
         cashier_name = ""
         if order["paid_by"]:
             cashier = users_repo.get_user(self._conn, order["paid_by"])

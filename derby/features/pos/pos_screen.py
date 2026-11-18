@@ -18,7 +18,7 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
-from derby.core.db import addons_repo, orders_repo, products_repo, tables_repo, users_repo
+from derby.core.db import addons_repo, orders_repo, products_repo, ps_devices_repo, tables_repo, users_repo
 from derby.core.i18n import ar
 from derby.features.pos import orders_service
 from derby.features.pos.addon_dialog import AddonDialog
@@ -112,7 +112,7 @@ class PosScreen(QWidget):
         product_grid.product_clicked.connect(self._on_product_clicked)
         body.addWidget(product_grid, 2)
 
-        cart_panel = CartPanel(self._conn, order_id=0)
+        cart_panel = CartPanel(self._conn, order_id=0, user=self._user)
         cart_panel.pay_requested.connect(self._on_pay_requested)
         cart_panel.discount_requested.connect(self._on_discount_requested)
         cart_panel.cancel_requested.connect(self._on_cancel_requested)
@@ -127,6 +127,9 @@ class PosScreen(QWidget):
         if order["table_id"]:
             table = tables_repo.get_table(self._conn, order["table_id"])
             self._order_label.setText(table["name"] if table is not None else "")
+        elif order["device_id"]:
+            device = ps_devices_repo.get_device(self._conn, order["device_id"])
+            self._order_label.setText(device["name"] if device is not None else "")
         else:
             self._order_label.setText(ar.TABLES_TAKEAWAY_SECTION)
         self._cart_panel.set_order(order_id)

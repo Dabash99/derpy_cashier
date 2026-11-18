@@ -46,6 +46,11 @@ This file covers engineering rules and conventions.
 
 - **Money** is always an integer number of piasters (1 EGP = 100 piasters).
   Never use `float` for money. See `derby/core/utils/money.py`.
+- **PlayStation session pricing**: each session line (single or multi) is
+  rounded to the nearest `rounding_step_egp` independently at the moment it
+  is billed — a visit with several sessions is the sum of already-rounded
+  lines, not one rounding of the visit's total. See
+  `derby/features/playstation/pricing.py`.
 - **Timestamps** are stored in the database as UTC ISO-8601 strings, and
   converted to Africa/Cairo local time only for display. See
   `derby/core/utils/time_utils.py` and `business_date.py`.

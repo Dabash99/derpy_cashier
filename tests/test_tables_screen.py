@@ -43,7 +43,11 @@ def test_move_order_dialog_excludes_busy_and_current_tables(qapp, db_conn):
     orders_service.get_or_create_table_order(db_conn, tables[1]["id"], owner_id)  # busy
 
     dialog = MoveOrderDialog(db_conn, order_a["id"], owner)
-    listed_table_ids = [dialog._list.item(i).data(1000) for i in range(dialog._list.count())]
+    listed_table_ids = [
+        target_id
+        for kind, target_id in (dialog._list.item(i).data(1000) for i in range(dialog._list.count()))
+        if kind == "table"
+    ]
     assert tables[0]["id"] not in listed_table_ids  # current table excluded
     assert tables[1]["id"] not in listed_table_ids  # busy table excluded
     assert tables[2]["id"] in listed_table_ids  # free table included
