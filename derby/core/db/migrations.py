@@ -49,8 +49,78 @@ def _migration_0001_initial(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0002_menu(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
+            name_ar TEXT NOT NULL,
+            name_en TEXT,
+            price_piasters INTEGER NOT NULL CHECK (price_piasters >= 0),
+            image_file TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            needs_price_review INTEGER NOT NULL DEFAULT 0,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES categories (id),
+            UNIQUE (category_id, name_ar)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS addon_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            min_select INTEGER NOT NULL DEFAULT 0,
+            max_select INTEGER,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS addons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            price_delta_piasters INTEGER NOT NULL CHECK (price_delta_piasters >= 0),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (group_id) REFERENCES addon_groups (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS product_addon_groups (
+            product_id INTEGER NOT NULL,
+            group_id INTEGER NOT NULL,
+            PRIMARY KEY (product_id, group_id),
+            FOREIGN KEY (product_id) REFERENCES products (id),
+            FOREIGN KEY (group_id) REFERENCES addon_groups (id)
+        )
+        """
+    )
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
+    _migration_0002_menu,
 ]
 
 
