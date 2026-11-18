@@ -29,7 +29,7 @@ from derby.features.expenses.exceptions import (
 )
 
 
-def _today_business_date(conn: sqlite3.Connection) -> date:
+def today_business_date(conn: sqlite3.Connection) -> date:
     close_time_text = settings_repo.get(conn, "business_close_time", "23:59") or "23:59"
     hour_str, minute_str = close_time_text.split(":")
     close_time = time_of_day(int(hour_str), int(minute_str))
@@ -57,7 +57,7 @@ def create_expense(
 ) -> sqlite3.Row:
     if amount_piasters <= 0:
         raise InvalidAmountError("amount must be greater than zero")
-    if expense_date > _today_business_date(conn):
+    if expense_date > today_business_date(conn):
         raise FutureDateError("expense_date cannot be in the future")
 
     receipt_file = _save_receipt_or_raise(receipt_source_path)
@@ -108,7 +108,7 @@ def replace_expense(
         raise VoidReasonRequiredError("a reason is required")
     if amount_piasters <= 0:
         raise InvalidAmountError("amount must be greater than zero")
-    if expense_date > _today_business_date(conn):
+    if expense_date > today_business_date(conn):
         raise FutureDateError("expense_date cannot be in the future")
 
     old_expense = expenses_repo.get_expense(conn, expense_id)

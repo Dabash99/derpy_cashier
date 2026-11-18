@@ -39,7 +39,7 @@ def test_create_expense_rejects_non_positive_amount(db_conn, owner_id, category_
 
 
 def test_create_expense_rejects_future_date(db_conn, owner_id, category_id):
-    future = expenses_service._today_business_date(db_conn) + timedelta(days=1)
+    future = expenses_service.today_business_date(db_conn) + timedelta(days=1)
     with pytest.raises(FutureDateError):
         expenses_service.create_expense(db_conn, category_id, 100, future, "", owner_id)
 
