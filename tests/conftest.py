@@ -5,12 +5,20 @@ database inside pytest's own tmp_path — never the real %APPDATA%.
 """
 from __future__ import annotations
 
-import pytest
-from PySide2.QtWidgets import QApplication
+import os
 
-from derby.core.db import settings_repo
-from derby.core.db.connection import connect
-from derby.core.db.migrations import run_pending_migrations
+# Headless on purpose: pytest must never pop up a real window on the
+# developer's desktop. "offscreen" is a real Qt platform plugin, not a
+# mock, so widgets still render/layout/grab() exactly as they would
+# on-screen.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+import pytest  # noqa: E402
+from PySide2.QtWidgets import QApplication  # noqa: E402
+
+from derby.core.db import settings_repo  # noqa: E402
+from derby.core.db.connection import connect  # noqa: E402
+from derby.core.db.migrations import run_pending_migrations  # noqa: E402
 
 
 @pytest.fixture()
