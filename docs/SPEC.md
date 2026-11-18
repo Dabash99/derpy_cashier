@@ -68,14 +68,17 @@ discussion history — just the decisions that shape the build.
 3. **Cashier & tables** (done) — cart, add-ons, 3 tables that can be
    added/disabled, discounts with permission + audit log, payment
    cash/InstaPay, sales log.
-4. **PlayStation** (this phase) — 2 devices (more can be added), Single/Multi
+4. **PlayStation** (done) — 2 devices (more can be added), Single/Multi
    hourly rates, timed sessions, a session becomes an order line, changing
    Single/Multi stops and starts a new session on the same order,
    transferring the bill table↔device is rejected if the target is busy,
    timers are computed from a UTC `started_at` so they survive an app
    restart.
 5. Printing — deferred; no printer integration yet.
-6. Expenses, reports, profit, export to Excel/CSV/PDF.
+6. **Expenses, reports, profit, export to Excel/CSV/PDF** (this phase) —
+   expense categories/recurring templates/receipts, a shared
+   `report_service` used by the daily/monthly/custom-range views and by
+   CSV/Excel/PDF export.
 7. Daily closing + backup (to the configured primary/secondary folders,
    including the `images` folder) + WhatsApp report send (manual, via
    `whatsapp_number` setting).

@@ -21,6 +21,8 @@ from derby.core.theme.stylesheet import build_stylesheet
 from derby.core.utils.single_instance import SingleInstanceGuard
 from derby.features.auth.login_screen import LoginScreen
 from derby.features.auth.setup_screen import SetupScreen
+from derby.features.expenses import expenses_service
+from derby.features.expenses.recurring_due_dialog import RecurringDueDialog
 from derby.features.playstation.ps_service import run_startup_consistency_check
 from derby.features.shell.idle_filter import IdleTimer
 from derby.features.shell.main_window import MainWindow
@@ -64,6 +66,11 @@ class AppController:
         self._main_window.resize(1100, 700)
         self._auth_stack.hide()
         self._main_window.show()
+
+        if user["role"] == users_repo.ROLE_OWNER:
+            today = expenses_service.today_business_date(self._conn)
+            if expenses_service.due_templates_for_month(self._conn, today):
+                RecurringDueDialog(self._conn, user, today, parent=self._main_window).exec_()
 
     def _on_lock_requested(self) -> None:
         if self._main_window is not None:

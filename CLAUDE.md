@@ -51,6 +51,22 @@ This file covers engineering rules and conventions.
   is billed — a visit with several sessions is the sum of already-rounded
   lines, not one rounding of the visit's total. See
   `derby/features/playstation/pricing.py`.
+- **Reports** (`derby/features/reports/report_service.py`) share one
+  definition of every figure across the daily/monthly/custom-range views
+  and every export format:
+  - Sales = paid orders only (void/cancelled excluded). Net sales =
+    `SUM(total_piasters)`, i.e. *after* each order's own discount.
+  - Top items and sales-by-category are computed straight from
+    `order_items`, so they are **gross** — before the order-level
+    discount — and the screen must say so next to them.
+  - PlayStation hours = `SUM(actual_minutes) / 60` of `ps_time` lines
+    still attached to a paid order; a removed (voided) line has no
+    `order_items` row left, so it drops out with no extra filter.
+  - Profit = net sales − active expenses in the same range (simple cash
+    basis, no cost of goods; can be negative).
+  - Average per day = net sales ÷ `days_elapsed`, where `days_elapsed`
+    is the whole range if it already ended before "today", or only the
+    days up to and including "today" if the range is still ongoing.
 - **Timestamps** are stored in the database as UTC ISO-8601 strings, and
   converted to Africa/Cairo local time only for display. See
   `derby/core/utils/time_utils.py` and `business_date.py`.
@@ -75,8 +91,8 @@ This file covers engineering rules and conventions.
       updates/           update_check.py (only networking file), version_logic.py (pure)
     features/
       auth/ settings/ shell/              <- built in Phase 1
-      menu/ pos/ tables/ playstation/
-      expenses/ reports/ closing/          <- empty, README.md "Phase N" placeholders
+      menu/ pos/ tables/ playstation/ expenses/ reports/
+      closing/                            <- empty, README.md "Phase N" placeholder
   assets/fonts/          Cairo font + OFL license
   tests/
   ```
@@ -104,7 +120,8 @@ Lint:
 ## Backups
 
 Backups (Phase 7) must include the images folder `%APPDATA%\Derby\images`
-alongside the database file — product photos live on disk, not in SQLite.
+and the receipts folder `%APPDATA%\Derby\receipts` alongside the database
+file — product photos and expense receipts both live on disk, not in SQLite.
 
 ## Windows 7 requirements (for the machine running Derby)
 

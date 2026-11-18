@@ -14,8 +14,8 @@ SECTIONS = [
     ("tables", ar.SIDEBAR_TABLES, None, permissions.view_tables),
     ("sales_log", ar.SIDEBAR_SALES_LOG, None, permissions.view_sales_today),
     ("playstation", ar.SIDEBAR_PLAYSTATION, None, permissions.use_ps),
-    ("expenses", ar.SIDEBAR_EXPENSES, 6, permissions.can_access_expenses),
-    ("reports", ar.SIDEBAR_REPORTS, 7, permissions.can_access_reports),
+    ("expenses", ar.SIDEBAR_EXPENSES, None, permissions.can_access_expenses),
+    ("reports", ar.SIDEBAR_REPORTS, None, permissions.can_access_reports),
     ("settings", ar.SIDEBAR_SETTINGS, None, permissions.can_access_settings),
 ]
 

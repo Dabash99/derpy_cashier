@@ -9,10 +9,12 @@ from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from derby.core.db import settings_repo
+from derby.features.expenses.expenses_screen import ExpensesScreen
 from derby.features.menu.menu_screen import MenuScreen
 from derby.features.playstation.playstation_screen import PlaystationScreen
 from derby.features.pos.pos_screen import PosScreen
 from derby.features.pos.sales_log_screen import SalesLogScreen
+from derby.features.reports.reports_screen import ReportsScreen
 from derby.features.settings.settings_screen import SettingsScreen
 from derby.features.shell.header import Header
 from derby.features.shell.idle_filter import IdleTimer
@@ -83,6 +85,10 @@ class MainWindow(QMainWindow):
                 widget = SalesLogScreen(self._conn, self._user)
             elif key == "playstation":
                 widget = PlaystationScreen(self._conn, self._user)
+            elif key == "expenses":
+                widget = ExpensesScreen(self._conn, self._user)
+            elif key == "reports":
+                widget = ReportsScreen(self._conn, self._user)
             else:
                 widget = PlaceholderScreen(phase)
             self._content_stack.addWidget(widget)
