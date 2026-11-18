@@ -444,3 +444,34 @@ def test_order_survives_reopening_the_db_mid_order(tmp_path):
     assert len(items) == 1
     assert items[0]["qty"] == 2
     reconnected.close()
+
+
+# --- "من يوم سابق" badge -----------------------------------------------------
+
+
+def test_is_from_previous_business_day(db_conn, owner, table, monkeypatch):
+    from derby.core.db import settings_repo
+
+    settings_repo.set_value(db_conn, "business_close_time", "03:00")
+
+    from derby.core.utils.time_utils import to_cairo
+
+    offset = to_cairo(datetime(2024, 1, 10, 12, 0, tzinfo=timezone.utc)).utcoffset()
+
+    # Order opened at 01:00 Cairo time (still "yesterday" with close_time 03:00).
+    cairo_0100 = datetime(2024, 1, 10, 1, 0, 0)
+    opened_utc = (cairo_0100 - offset).replace(tzinfo=timezone.utc)
+    monkeypatch.setattr("derby.features.pos.orders_service.utc_now", lambda: opened_utc)
+    order = orders_service.get_or_create_table_order(db_conn, table["id"], owner["id"])
+
+    # "Now" has moved on to the next business day (same calendar day, after close time).
+    cairo_1000 = datetime(2024, 1, 10, 10, 0, 0)
+    now_utc = (cairo_1000 - offset).replace(tzinfo=timezone.utc)
+    monkeypatch.setattr("derby.features.pos.orders_service.utc_now", lambda: now_utc)
+
+    assert orders_service.is_from_previous_business_day(db_conn, order) is True
+
+
+def test_is_not_from_previous_business_day_when_opened_today(db_conn, owner, table):
+    order = orders_service.get_or_create_table_order(db_conn, table["id"], owner["id"])
+    assert orders_service.is_from_previous_business_day(db_conn, order) is False
