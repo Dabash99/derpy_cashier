@@ -9,6 +9,7 @@ from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from derby.core.db import settings_repo
+from derby.features.menu.menu_screen import MenuScreen
 from derby.features.settings.settings_screen import SettingsScreen
 from derby.features.shell.header import Header
 from derby.features.shell.idle_filter import IdleTimer
@@ -68,6 +69,8 @@ class MainWindow(QMainWindow):
                 continue
             if key == "settings":
                 widget = SettingsScreen(self._conn, self._user["id"])
+            elif key == "menu":
+                widget = MenuScreen(self._conn, self._user["id"])
             else:
                 widget = PlaceholderScreen(phase)
             self._content_stack.addWidget(widget)

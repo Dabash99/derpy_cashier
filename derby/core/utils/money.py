@@ -13,15 +13,19 @@ def egp_to_piasters(egp: int) -> int:
     return egp * PIASTERS_PER_EGP
 
 
-def format_egp(piasters: int) -> str:
-    """Format piasters as an Arabic-friendly "12.34 ج.م" style string."""
+def piasters_to_plain_text(piasters: int) -> str:
+    """Formats piasters as a plain "12.34" string -- no currency label, for
+    pre-filling an editable price field or writing a CSV value."""
     sign = "-" if piasters < 0 else ""
     whole_piasters = abs(piasters)
     egp_part = whole_piasters // PIASTERS_PER_EGP
     fraction_part = whole_piasters % PIASTERS_PER_EGP
-    return "{sign}{egp}.{fraction:02d} ج.م".format(
-        sign=sign, egp=egp_part, fraction=fraction_part
-    )
+    return "{sign}{egp}.{fraction:02d}".format(sign=sign, egp=egp_part, fraction=fraction_part)
+
+
+def format_egp(piasters: int) -> str:
+    """Format piasters as an Arabic-friendly "12.34 ج.م" style string."""
+    return "{0} ج.م".format(piasters_to_plain_text(piasters))
 
 
 def parse_egp_input(text: str) -> int:

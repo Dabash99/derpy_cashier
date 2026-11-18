@@ -3,6 +3,7 @@ from __future__ import annotations
 from derby.core.utils.money import (
     format_egp,
     parse_egp_input,
+    piasters_to_plain_text,
     ps_session_price_piasters,
     round_to_nearest,
 )
@@ -12,6 +13,12 @@ def test_format_egp_basic():
     assert format_egp(1234) == "12.34 ج.م"
     assert format_egp(100) == "1.00 ج.م"
     assert format_egp(0) == "0.00 ج.م"
+
+
+def test_piasters_to_plain_text():
+    assert piasters_to_plain_text(1234) == "12.34"
+    assert piasters_to_plain_text(100) == "1.00"
+    assert piasters_to_plain_text(0) == "0.00"
 
 
 def test_parse_egp_input_basic():

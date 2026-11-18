@@ -47,9 +47,11 @@ def test_main_window_hides_sections_for_cashier(qapp, db_conn):
     assert "settings" in owner_window._screens
     assert "expenses" in owner_window._screens
     assert "reports" in owner_window._screens
+    assert "menu" in owner_window._screens
 
     cashier_window = MainWindow(db_conn, cashier_row, IdleTimer())
     assert "settings" not in cashier_window._screens
     assert "expenses" not in cashier_window._screens
     assert "reports" not in cashier_window._screens
+    assert "menu" not in cashier_window._screens
     assert "pos" in cashier_window._screens
