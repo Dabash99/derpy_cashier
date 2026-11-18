@@ -6,9 +6,8 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide2.QtCore import Signal
+from PySide2.QtCore import QRegExp, Signal
 from PySide2.QtGui import QRegExpValidator
-from PySide2.QtCore import QRegExp
 from PySide2.QtWidgets import (
     QLabel,
     QLineEdit,

@@ -4,8 +4,8 @@ from __future__ import annotations
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
-from derby.core.i18n import ar
 from derby.core.db.users_repo import ROLE_OWNER
+from derby.core.i18n import ar
 
 
 class Header(QWidget):

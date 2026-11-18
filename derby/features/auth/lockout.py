@@ -7,10 +7,9 @@ tests can inject a fake clock instead of sleeping or mocking datetime.
 """
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional
-
-import sqlite3
 
 from derby.core.db import audit_repo, settings_repo
 from derby.core.utils.time_utils import parse_utc_iso, to_utc_iso, utc_now
