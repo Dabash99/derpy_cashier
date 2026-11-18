@@ -63,10 +63,11 @@ discussion history — just the decisions that shape the build.
    with lockout, roles/permissions, settings screen, main window shell
    with placeholders, the manual update-check feature, and the full
    test/policy suite.
-2. **Menu** (this phase) — categories, products, add-ons, CSV import/export,
+2. **Menu** (done) — categories, products, add-ons, CSV import/export,
    product images.
-3. Cashier & tables — cart, add-ons, 3 tables that can be added/disabled,
-   discounts with permission + audit log, payment cash/InstaPay, sales log.
+3. **Cashier & tables** (this phase) — cart, add-ons, 3 tables that can be
+   added/disabled, discounts with permission + audit log, payment
+   cash/InstaPay, sales log.
 4. PlayStation — 2 devices (more can be added), Single/Multi hourly rates,
    timed sessions, a session becomes an order line, changing Single/Multi
    stops and starts a new session on the same order, transferring the bill
