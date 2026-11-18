@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide2.QtGui import QImage
 
 from derby.core.db import categories_repo, products_repo
+from derby.features.menu.csv_export import export_menu_csv
 from derby.features.menu.csv_importer import (
     EXISTS_ACTION_SKIP,
     EXISTS_ACTION_UPDATE,
@@ -132,6 +133,33 @@ def test_apply_import_counts_invalid_rows(db_conn, tmp_path):
     counts = apply_import(db_conn, rows, tmp_path)
     assert counts["invalid"] == 1
     assert counts["new"] == 1
+
+
+def test_export_then_reimport_round_trip_is_idempotent(qapp, db_conn, tmp_path, monkeypatch):
+    monkeypatch.setattr("derby.features.menu.images.app_data_dir", lambda: tmp_path / "appdata")
+
+    rows = classify_rows(db_conn, [_raw(name_ar="قهوة", price="25"), _raw(name_ar="شاي", price="15")], tmp_path)
+    apply_import(db_conn, rows, tmp_path)
+    assert len(products_repo.list_products(db_conn)) == 2
+
+    export_dir = tmp_path / "export"
+    export_dir.mkdir()
+    export_path = export_dir / "menu.csv"
+    export_menu_csv(db_conn, export_path)
+
+    exported_text = export_path.read_text(encoding="utf-8-sig")
+    assert "قهوة" in exported_text
+    assert "شاي" in exported_text
+
+    from derby.features.menu.csv_parser import parse_csv_text
+
+    raw_rows_from_export = parse_csv_text(exported_text)
+    reimport_rows = classify_rows(db_conn, raw_rows_from_export, export_dir / "images")
+    counts = apply_import(db_conn, reimport_rows, export_dir / "images")
+
+    assert counts["new"] == 0
+    assert counts["skipped"] == 2
+    assert len(products_repo.list_products(db_conn)) == 2
 
 
 def test_apply_import_auto_creates_category(db_conn, tmp_path):
