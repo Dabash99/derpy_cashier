@@ -5,6 +5,9 @@ handles stale locks left behind by a crashed process automatically.
 """
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Optional
+
 from PySide2.QtCore import QLockFile
 
 from derby.core.utils.paths import lock_file_path
@@ -13,8 +16,9 @@ _STALE_LOCK_TIME_MS = 30_000
 
 
 class SingleInstanceGuard:
-    def __init__(self) -> None:
-        self._lock_file = QLockFile(str(lock_file_path()))
+    def __init__(self, path: Optional[Path] = None) -> None:
+        lock_path = path if path is not None else lock_file_path()
+        self._lock_file = QLockFile(str(lock_path))
         self._lock_file.setStaleLockTime(_STALE_LOCK_TIME_MS)
 
     def try_acquire(self) -> bool:

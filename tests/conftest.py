@@ -6,6 +6,7 @@ database inside pytest's own tmp_path — never the real %APPDATA%.
 from __future__ import annotations
 
 import pytest
+from PySide2.QtWidgets import QApplication
 
 from derby.core.db import settings_repo
 from derby.core.db.connection import connect
@@ -19,3 +20,12 @@ def db_conn(tmp_path):
     settings_repo.ensure_defaults(conn)
     yield conn
     conn.close()
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """One QApplication for the whole test session (Qt forbids more than one)."""
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    return app
