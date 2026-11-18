@@ -315,11 +315,73 @@ def _migration_0004_playstation(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migration_0005_expenses(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS expense_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recurring_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            amount_piasters INTEGER NOT NULL CHECK (amount_piasters > 0),
+            day_of_month INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 31),
+            is_active INTEGER NOT NULL DEFAULT 1,
+            last_generated_month TEXT,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES expense_categories (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
+            amount_piasters INTEGER NOT NULL CHECK (amount_piasters > 0),
+            expense_date TEXT NOT NULL,
+            description TEXT,
+            receipt_file TEXT,
+            recurring_id INTEGER,
+            status TEXT NOT NULL CHECK (status IN ('active', 'void')),
+            void_reason TEXT,
+            voided_by INTEGER,
+            voided_at_utc TEXT,
+            replaced_by_id INTEGER,
+            created_by INTEGER NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES expense_categories (id),
+            FOREIGN KEY (recurring_id) REFERENCES recurring_expenses (id),
+            FOREIGN KEY (voided_by) REFERENCES users (id),
+            FOREIGN KEY (replaced_by_id) REFERENCES expenses (id),
+            FOREIGN KEY (created_by) REFERENCES users (id)
+        )
+        """
+    )
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_expenses_date_status ON expenses (expense_date, status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_business_date_status ON orders (business_date, status)")
+
+    for sort_order, name in enumerate(["إيجار", "كهرباء", "مياه", "صيانة", "أدوات شغل", "أخرى"], start=1):
+        conn.execute(
+            "INSERT INTO expense_categories (name, sort_order, is_active) VALUES (?, ?, 1)", (name, sort_order)
+        )
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
     _migration_0003_cashier,
     _migration_0004_playstation,
+    _migration_0005_expenses,
 ]
 
 
