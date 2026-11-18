@@ -10,11 +10,14 @@ from PySide2.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLay
 
 from derby.core.db import settings_repo
 from derby.features.menu.menu_screen import MenuScreen
+from derby.features.pos.pos_screen import PosScreen
+from derby.features.pos.sales_log_screen import SalesLogScreen
 from derby.features.settings.settings_screen import SettingsScreen
 from derby.features.shell.header import Header
 from derby.features.shell.idle_filter import IdleTimer
 from derby.features.shell.placeholder_screen import PlaceholderScreen
 from derby.features.shell.sidebar import SECTIONS, Sidebar
+from derby.features.tables.tables_screen import TablesScreen
 
 
 class MainWindow(QMainWindow):
@@ -71,10 +74,27 @@ class MainWindow(QMainWindow):
                 widget = SettingsScreen(self._conn, self._user["id"])
             elif key == "menu":
                 widget = MenuScreen(self._conn, self._user["id"])
+            elif key == "pos":
+                widget = PosScreen(self._conn, self._user)
+            elif key == "tables":
+                widget = TablesScreen(self._conn, self._user)
+            elif key == "sales_log":
+                widget = SalesLogScreen(self._conn, self._user)
             else:
                 widget = PlaceholderScreen(phase)
             self._content_stack.addWidget(widget)
             self._screens[key] = widget
+
+        tables_screen = self._screens.get("tables")
+        pos_screen = self._screens.get("pos")
+        if tables_screen is not None and pos_screen is not None:
+            tables_screen.order_opened.connect(self._on_order_opened_from_tables)
+
+    def _on_order_opened_from_tables(self, order_id: int) -> None:
+        pos_screen = self._screens.get("pos")
+        if pos_screen is not None:
+            pos_screen.open_order(order_id)
+            self._on_navigate("pos")
 
     def _on_navigate(self, key: str) -> None:
         widget = self._screens.get(key)

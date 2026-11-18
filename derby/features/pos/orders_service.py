@@ -15,7 +15,7 @@ from typing import List, Optional
 
 from derby.core.db import audit_repo, orders_repo, products_repo, settings_repo, users_repo
 from derby.core.utils.business_date import business_date as compute_business_date
-from derby.core.utils.time_utils import utc_now
+from derby.core.utils.time_utils import parse_utc_iso, utc_now
 from derby.features.pos import discount_math, owner_approval
 from derby.features.pos.addon_selection import validate_and_snapshot_addons
 from derby.features.pos.exceptions import (
@@ -41,6 +41,16 @@ def _close_time_setting(conn: sqlite3.Connection) -> time_of_day:
     text = settings_repo.get(conn, "business_close_time", "23:59") or "23:59"
     hour_str, minute_str = text.split(":")
     return time_of_day(int(hour_str), int(minute_str))
+
+
+def is_from_previous_business_day(conn: sqlite3.Connection, order: sqlite3.Row) -> bool:
+    """An open order has no business_date yet (that's only assigned at
+    payment) -- this compares when it was opened against "today" using the
+    same close-time rule, for the tables screen's "من يوم سابق" badge."""
+    close_time = _close_time_setting(conn)
+    opened_business_date = compute_business_date(parse_utc_iso(order["opened_at_utc"]), close_time)
+    today_business_date = compute_business_date(utc_now(), close_time)
+    return opened_business_date != today_business_date
 
 
 # --- opening orders ----------------------------------------------------
