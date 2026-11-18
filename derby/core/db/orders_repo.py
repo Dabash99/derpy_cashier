@@ -16,13 +16,19 @@ from derby.core.utils.time_utils import to_utc_iso, utc_now
 # --- orders ------------------------------------------------------------
 
 
-def create_order(conn: sqlite3.Connection, table_id: Optional[int], opened_by: int, commit: bool = True) -> int:
+def create_order(
+    conn: sqlite3.Connection,
+    table_id: Optional[int],
+    opened_by: int,
+    device_id: Optional[int] = None,
+    commit: bool = True,
+) -> int:
     cursor = conn.execute(
         """
-        INSERT INTO orders (table_id, status, opened_at_utc, opened_by, subtotal_piasters, discount_piasters, total_piasters)
-        VALUES (?, 'open', ?, ?, 0, 0, 0)
+        INSERT INTO orders (table_id, device_id, status, opened_at_utc, opened_by, subtotal_piasters, discount_piasters, total_piasters)
+        VALUES (?, ?, 'open', ?, ?, 0, 0, 0)
         """,
-        (table_id, to_utc_iso(utc_now()), opened_by),
+        (table_id, device_id, to_utc_iso(utc_now()), opened_by),
     )
     if commit:
         conn.commit()
@@ -36,6 +42,12 @@ def get_order(conn: sqlite3.Connection, order_id: int) -> Optional[sqlite3.Row]:
 def get_open_order_for_table(conn: sqlite3.Connection, table_id: int) -> Optional[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM orders WHERE table_id = ? AND status = 'open'", (table_id,)
+    ).fetchone()
+
+
+def get_open_order_for_device(conn: sqlite3.Connection, device_id: int) -> Optional[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM orders WHERE device_id = ? AND status = 'open'", (device_id,)
     ).fetchone()
 
 
@@ -133,8 +145,19 @@ def mark_order_void(
         conn.commit()
 
 
-def set_order_table(conn: sqlite3.Connection, order_id: int, table_id: Optional[int], commit: bool = True) -> None:
-    conn.execute("UPDATE orders SET table_id = ? WHERE id = ?", (table_id, order_id))
+def set_order_location(
+    conn: sqlite3.Connection,
+    order_id: int,
+    table_id: Optional[int] = None,
+    device_id: Optional[int] = None,
+    commit: bool = True,
+) -> None:
+    """Moves an order to a table or a device, always clearing the other
+    column -- an order never belongs to both (see the Phase 4 migration's
+    exclusivity trigger)."""
+    conn.execute(
+        "UPDATE orders SET table_id = ?, device_id = ? WHERE id = ?", (table_id, device_id, order_id)
+    )
     if commit:
         conn.commit()
 
@@ -166,14 +189,15 @@ def create_order_item(
     qty: int,
     line_total_piasters: int,
     note: Optional[str] = None,
+    ps_session_id: Optional[int] = None,
     commit: bool = True,
 ) -> int:
     cursor = conn.execute(
         """
         INSERT INTO order_items (
             order_id, kind, product_id, name_snapshot, unit_price_snapshot_piasters,
-            qty, line_total_piasters, note, created_at_utc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            qty, line_total_piasters, note, ps_session_id, created_at_utc
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             order_id,
@@ -184,6 +208,7 @@ def create_order_item(
             qty,
             line_total_piasters,
             note,
+            ps_session_id,
             to_utc_iso(utc_now()),
         ),
     )

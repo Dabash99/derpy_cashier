@@ -13,17 +13,19 @@ import sqlite3
 from datetime import time as time_of_day
 from typing import List, Optional
 
-from derby.core.db import audit_repo, orders_repo, products_repo, settings_repo, users_repo
+from derby.core.db import audit_repo, orders_repo, products_repo, ps_sessions_repo, settings_repo, users_repo
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.time_utils import parse_utc_iso, utc_now
 from derby.features.pos import discount_math, owner_approval
 from derby.features.pos.addon_selection import validate_and_snapshot_addons
 from derby.features.pos.exceptions import (
+    DeviceBusyError,
     DiscountExceedsSubtotalError,
     DiscountReasonRequiredError,
     InvalidTransitionError,
     PermissionDeniedError,
     QuantityOutOfRangeError,
+    SessionRunningError,
     TableBusyError,
     VoidReasonRequiredError,
 )
@@ -68,6 +70,14 @@ def create_takeaway_order(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row
     # Takeaway orders are never shared/reused -- every "new takeaway" click
     # starts a fresh one, unlike a table which reopens its existing order.
     order_id = orders_repo.create_order(conn, None, user_id)
+    return orders_repo.get_order(conn, order_id)
+
+
+def get_or_create_device_order(conn: sqlite3.Connection, device_id: int, user_id: int) -> sqlite3.Row:
+    existing = orders_repo.get_open_order_for_device(conn, device_id)
+    if existing is not None:
+        return existing
+    order_id = orders_repo.create_order(conn, None, user_id, device_id=device_id)
     return orders_repo.get_order(conn, order_id)
 
 
@@ -215,7 +225,7 @@ def apply_discount(
     if discount_piasters > order["subtotal_piasters"]:
         raise DiscountExceedsSubtotalError("discount cannot exceed the subtotal")
 
-    approver_id = _resolve_approver(conn, requesting_user, approving_pin)
+    approver_id = owner_approval.resolve_approver(conn, requesting_user, approving_pin)
 
     try:
         orders_repo.set_order_discount(conn, order_id, discount_piasters, reason, approver_id, commit=False)
@@ -240,7 +250,7 @@ def remove_discount(
     order = orders_repo.get_order(conn, order_id)
     _require_open(order)
 
-    approver_id = _resolve_approver(conn, requesting_user, approving_pin)
+    approver_id = owner_approval.resolve_approver(conn, requesting_user, approving_pin)
 
     try:
         orders_repo.clear_order_discount(conn, order_id, commit=False)
@@ -257,15 +267,6 @@ def remove_discount(
     return orders_repo.get_order(conn, order_id)
 
 
-def _resolve_approver(conn: sqlite3.Connection, requesting_user: sqlite3.Row, approving_pin: Optional[str]) -> int:
-    """Owner acting on their own order needs no extra PIN. A cashier always
-    does -- verify_owner_pin raises if it's wrong/locked out."""
-    if requesting_user["role"] == users_repo.ROLE_OWNER:
-        return requesting_user["id"]
-    owner = owner_approval.verify_owner_pin(conn, approving_pin or "")
-    return owner["id"]
-
-
 # --- cancel / pay / void ----------------------------------------------------
 
 
@@ -278,7 +279,7 @@ def cancel(
     has_items = len(orders_repo.list_order_items(conn, order_id)) > 0
     approver_id = None
     if has_items:
-        approver_id = _resolve_approver(conn, requesting_user, approving_pin)
+        approver_id = owner_approval.resolve_approver(conn, requesting_user, approving_pin)
 
     try:
         orders_repo.mark_order_cancelled(conn, order_id, commit=False)
@@ -297,6 +298,8 @@ def cancel(
 def pay(conn: sqlite3.Connection, order_id: int, payment_method: str, requesting_user: sqlite3.Row) -> sqlite3.Row:
     order = orders_repo.get_order(conn, order_id)
     _require_open(order)
+    if order["device_id"] is not None and ps_sessions_repo.get_running_session(conn, order["device_id"]) is not None:
+        raise SessionRunningError("device {0} has a running session".format(order["device_id"]))
 
     close_time = _close_time_setting(conn)
     today = compute_business_date(utc_now(), close_time).isoformat()
@@ -335,26 +338,81 @@ def void(conn: sqlite3.Connection, order_id: int, reason: str, requesting_user: 
     return orders_repo.get_order(conn, order_id)
 
 
-# --- moving orders (Phase 4 will reuse this for PlayStation devices) -------
+# --- moving orders (generic: a table or a PlayStation device) --------------
 
 
-def move_order(conn: sqlite3.Connection, order_id: int, target_table_id: Optional[int], requesting_user: sqlite3.Row) -> sqlite3.Row:
+def move_order(
+    conn: sqlite3.Connection,
+    order_id: int,
+    target_table_id: Optional[int],
+    requesting_user: sqlite3.Row,
+    target_device_id: Optional[int] = None,
+) -> sqlite3.Row:
+    """Moves an order to a free table or a free device. table -> device is
+    rejected if the device has an open order; device -> table is rejected if
+    the table has an open order OR the device still has a running session
+    (stop it first). Never merges -- a busy target is simply rejected."""
     order = orders_repo.get_order(conn, order_id)
     _require_open(order)
+
+    if order["device_id"] is not None and ps_sessions_repo.get_running_session(conn, order["device_id"]) is not None:
+        raise SessionRunningError("device {0} has a running session -- stop it before moving".format(order["device_id"]))
 
     if target_table_id is not None:
         busy_order = orders_repo.get_open_order_for_table(conn, target_table_id)
         if busy_order is not None and busy_order["id"] != order_id:
             raise TableBusyError("table {0} already has an open order".format(target_table_id))
+    elif target_device_id is not None:
+        busy_order = orders_repo.get_open_order_for_device(conn, target_device_id)
+        if busy_order is not None and busy_order["id"] != order_id:
+            raise DeviceBusyError("device {0} already has an open order".format(target_device_id))
 
     from_table_id = order["table_id"]
+    from_device_id = order["device_id"]
     try:
-        orders_repo.set_order_table(conn, order_id, target_table_id, commit=False)
+        orders_repo.set_order_location(conn, order_id, table_id=target_table_id, device_id=target_device_id, commit=False)
         audit_repo.log(
             conn,
             "order_moved",
             user_id=requesting_user["id"],
-            details="order={0} from_table={1} to_table={2}".format(order_id, from_table_id, target_table_id),
+            details="order={0} from_table={1} from_device={2} to_table={3} to_device={4}".format(
+                order_id, from_table_id, from_device_id, target_table_id, target_device_id
+            ),
+        )
+    except Exception:
+        conn.rollback()
+        raise
+    return orders_repo.get_order(conn, order_id)
+
+
+# --- removing a ps_time line (owner approval required, session kept, marked voided) -----
+
+
+def remove_ps_item(
+    conn: sqlite3.Connection,
+    order_id: int,
+    item_id: int,
+    requesting_user: sqlite3.Row,
+    approving_pin: Optional[str] = None,
+) -> sqlite3.Row:
+    order = orders_repo.get_order(conn, order_id)
+    _require_open(order)
+    item = orders_repo.get_order_item(conn, item_id)
+    if item is None or item["kind"] != "ps_time":
+        raise InvalidTransitionError("item {0} is not a ps_time line".format(item_id))
+
+    approver_id = owner_approval.resolve_approver(conn, requesting_user, approving_pin)
+
+    try:
+        if item["ps_session_id"] is not None:
+            ps_sessions_repo.mark_voided(conn, item["ps_session_id"], requesting_user["id"], commit=False)
+        orders_repo.delete_order_item(conn, item_id, commit=False)
+        recompute_totals(conn, order_id, commit=False)
+        audit_repo.log(
+            conn,
+            "ps_line_removed",
+            user_id=requesting_user["id"],
+            details="order={0} item={1} approved_by={2}".format(order_id, item_id, approver_id),
         )
     except Exception:
         conn.rollback()

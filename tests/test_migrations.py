@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from derby.core.db import users_repo
+from derby.core.db import orders_repo, tables_repo, users_repo
 from derby.core.db.connection import connect
-from derby.core.db.migrations import MIGRATIONS, _migration_0001_initial, run_pending_migrations
+from derby.core.db.migrations import (
+    MIGRATIONS,
+    _migration_0001_initial,
+    _migration_0002_menu,
+    _migration_0003_cashier,
+    run_pending_migrations,
+)
 
 
 def _table_names(conn):
@@ -59,4 +65,35 @@ def test_migration_2_preserves_phase_1_data(tmp_path):
 
     tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert {"categories", "products", "addon_groups", "addons", "product_addon_groups"}.issubset(tables)
+    conn.close()
+
+
+def test_migration_4_preserves_phase_3_data(tmp_path):
+    """A cafe already running Phase 3 (tables/orders) must keep its data
+    when it upgrades to Phase 4 (PlayStation)."""
+    db_path = tmp_path / "upgrade34.db"
+    conn = connect(db_path)
+    conn.execute("BEGIN")
+    _migration_0001_initial(conn)
+    _migration_0002_menu(conn)
+    _migration_0003_cashier(conn)
+    conn.execute("PRAGMA user_version = 3")
+    conn.commit()
+
+    owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
+    table = tables_repo.list_tables(conn)[0]
+    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+
+    run_pending_migrations(conn)  # applies migration 4 on top
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+    order = orders_repo.get_order(conn, order_id)
+    assert order is not None
+    assert order["table_id"] == table["id"]
+
+    tables_in_db = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    assert {"ps_devices", "ps_sessions"}.issubset(tables_in_db)
+    devices = conn.execute("SELECT * FROM ps_devices ORDER BY sort_order").fetchall()
+    assert len(devices) == 2
+    assert all(row["single_rate_piasters_per_hour"] == 0 for row in devices)
     conn.close()

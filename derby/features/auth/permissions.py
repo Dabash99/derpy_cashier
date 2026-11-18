@@ -45,8 +45,13 @@ def view_sales_all_dates(role: str) -> bool:
     return role == ROLE_OWNER
 
 
-def can_access_playstation(role: str) -> bool:
+def use_ps(role: str) -> bool:
     return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def manage_ps_devices(role: str) -> bool:
+    """Add/rename/set rates/reorder/disable devices -- owner only."""
+    return role == ROLE_OWNER
 
 
 def can_access_expenses(role: str) -> bool:

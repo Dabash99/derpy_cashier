@@ -34,3 +34,14 @@ def verify_owner_pin(conn: sqlite3.Connection, pin: str) -> sqlite3.Row:
 
     lockout.record_failed_attempt(conn)
     raise WrongApprovalPinError("no active owner matches the given PIN")
+
+
+def resolve_approver(conn: sqlite3.Connection, requesting_user: sqlite3.Row, approving_pin) -> int:
+    """Owner acting on their own order/device needs no extra PIN. Anyone
+    else always does -- verify_owner_pin raises if it's wrong/locked out.
+    Shared by orders_service (discount/cancel) and ps_service (backdating a
+    session start, removing a ps_time line)."""
+    if requesting_user["role"] == users_repo.ROLE_OWNER:
+        return requesting_user["id"]
+    owner = verify_owner_pin(conn, approving_pin or "")
+    return owner["id"]

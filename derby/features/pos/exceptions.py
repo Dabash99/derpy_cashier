@@ -47,3 +47,15 @@ class PermissionDeniedError(OrderError):
 
 class VoidReasonRequiredError(OrderError):
     pass
+
+
+class DeviceBusyError(OrderError):
+    """The target PlayStation device already has an open order."""
+
+
+class DeviceRateNotSetError(OrderError):
+    """Starting a session on a device whose rate for this mode is 0 (unconfigured)."""
+
+
+class SessionRunningError(OrderError):
+    """A running PlayStation session blocks this action (pay, move, disable, ...)."""

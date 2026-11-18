@@ -220,10 +220,106 @@ def _migration_0003_cashier(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migration_0004_playstation(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ps_devices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            single_rate_piasters_per_hour INTEGER NOT NULL DEFAULT 0,
+            multi_rate_piasters_per_hour INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ps_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id INTEGER NOT NULL,
+            order_id INTEGER NOT NULL,
+            mode TEXT NOT NULL CHECK (mode IN ('single', 'multi')),
+            started_at_utc TEXT NOT NULL,
+            stopped_at_utc TEXT,
+            rate_snapshot_piasters_per_hour INTEGER NOT NULL,
+            device_name_snapshot TEXT NOT NULL,
+            actual_minutes INTEGER,
+            billed_minutes INTEGER,
+            price_piasters INTEGER,
+            order_item_id INTEGER,
+            is_final INTEGER NOT NULL DEFAULT 0,
+            started_by INTEGER NOT NULL,
+            stopped_by INTEGER,
+            voided_at_utc TEXT,
+            voided_by INTEGER,
+            FOREIGN KEY (device_id) REFERENCES ps_devices (id),
+            FOREIGN KEY (order_id) REFERENCES orders (id),
+            FOREIGN KEY (order_item_id) REFERENCES order_items (id),
+            FOREIGN KEY (started_by) REFERENCES users (id),
+            FOREIGN KEY (stopped_by) REFERENCES users (id),
+            FOREIGN KEY (voided_by) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute("ALTER TABLE order_items ADD COLUMN ps_session_id INTEGER")
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ps_sessions_device_stopped ON ps_sessions (device_id, stopped_at_utc)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ps_sessions_order_id ON ps_sessions (order_id)")
+    # Only one running (stopped_at_utc IS NULL) session per device at a time.
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ps_sessions_one_running_per_device "
+        "ON ps_sessions (device_id) WHERE stopped_at_utc IS NULL"
+    )
+    # Only one open order per device at a time (mirrors idx_orders_one_open_per_table).
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_one_open_per_device "
+        "ON orders (device_id) WHERE status = 'open' AND device_id IS NOT NULL"
+    )
+
+    # Defense in depth alongside the service-layer check: an order belongs to
+    # a table, a device, or takeaway -- never both a table and a device.
+    conn.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS trg_orders_table_device_exclusive_insert
+        BEFORE INSERT ON orders
+        WHEN NEW.table_id IS NOT NULL AND NEW.device_id IS NOT NULL
+        BEGIN
+            SELECT RAISE(ABORT, 'order cannot have both table_id and device_id');
+        END
+        """
+    )
+    conn.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS trg_orders_table_device_exclusive_update
+        BEFORE UPDATE ON orders
+        WHEN NEW.table_id IS NOT NULL AND NEW.device_id IS NOT NULL
+        BEGIN
+            SELECT RAISE(ABORT, 'order cannot have both table_id and device_id');
+        END
+        """
+    )
+
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES ('ps_long_session_hours', '6') "
+        "ON CONFLICT(key) DO NOTHING"
+    )
+
+    for sort_order, name in enumerate(["بلاي ستيشن 1", "بلاي ستيشن 2"], start=1):
+        conn.execute(
+            "INSERT INTO ps_devices (name, single_rate_piasters_per_hour, multi_rate_piasters_per_hour, sort_order, is_active) "
+            "VALUES (?, 0, 0, ?, 1)",
+            (name, sort_order),
+        )
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
     _migration_0003_cashier,
+    _migration_0004_playstation,
 ]
 
 

@@ -16,6 +16,7 @@ DEFAULTS: Dict[str, str] = {
     "business_close_time": "23:59",
     "ps_min_minutes": "30",
     "rounding_step_egp": "5",
+    "ps_long_session_hours": "6",
     "whatsapp_number": "",
     "backup_folder_primary": str(default_backup_dir()),
     "backup_folder_secondary": "",
