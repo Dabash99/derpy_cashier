@@ -22,6 +22,7 @@ class ClosingBannerWidget(QWidget):
         super().__init__(parent)
         self._conn = conn
         self._user = user
+        self._status_label_by_closure_id = {}
         self._rows_layout = QVBoxLayout(self)
         self._rows_layout.setContentsMargins(8, 4, 8, 4)
         self.reload()
@@ -31,6 +32,7 @@ class ClosingBannerWidget(QWidget):
             item = self._rows_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+        self._status_label_by_closure_id = {}
 
         if closing_service.is_backup_stale_for_banner(self._conn, utc_now()):
             old_backup_label = QLabel(ar.CLOSING_OLD_BACKUP_WARNING)
@@ -46,7 +48,7 @@ class ClosingBannerWidget(QWidget):
         layout.addWidget(QLabel(ar.CLOSING_BANNER_TEXT.format(date=closure["business_date"])))
 
         whatsapp_button = QPushButton(ar.CLOSING_BANNER_WHATSAPP_BUTTON)
-        whatsapp_button.clicked.connect(lambda _checked=False, c=closure: self._on_send(c, whatsapp.METHOD_DESKTOP))
+        whatsapp_button.clicked.connect(lambda _checked=False, c=closure: self._on_send(c, self._configured_method()))
         layout.addWidget(whatsapp_button)
 
         browser_button = QPushButton(ar.CLOSING_BANNER_BROWSER_BUTTON)
@@ -65,11 +67,21 @@ class ClosingBannerWidget(QWidget):
         sent_button.clicked.connect(lambda _checked=False, c=closure: self._on_mark_sent(c))
         layout.addWidget(sent_button)
 
+        status_label = QLabel("")
+        layout.addWidget(status_label)
+        self._status_label_by_closure_id[closure["id"]] = status_label
+
         return row
+
+    def _configured_method(self) -> str:
+        return settings_repo.get(self._conn, "whatsapp_method", whatsapp.METHOD_DESKTOP) or whatsapp.METHOD_DESKTOP
 
     def _on_send(self, closure: sqlite3.Row, method: str) -> None:
         number = settings_repo.get(self._conn, "whatsapp_number", "") or ""
-        self._last_result = whatsapp.open_report(method, number, closure["report_text"])
+        result = whatsapp.open_report(method, number, closure["report_text"])
+        status_label = self._status_label_by_closure_id.get(closure["id"])
+        if status_label is not None:
+            status_label.setText(result.message)
 
     def _on_view(self, closure: sqlite3.Row) -> None:
         ClosingReportViewerDialog(closure["report_text"], parent=self).exec_()

@@ -11,9 +11,19 @@ This file covers engineering rules and conventions.
 ## Hard constraints
 
 1. **No networking**, except the manual "فحص التحديثات" (check for updates)
-   button in Settings. No telemetry, no auto-update, no accounts, no
-   analytics, no crash reporting. All networking code lives only in
-   `derby/core/updates/update_check.py`.
+   button in Settings (`derby/core/updates/update_check.py`) and the
+   WhatsApp report hand-off (`derby/core/integrations/whatsapp.py`,
+   Phase 7). The app itself still makes no network request in either
+   case: WhatsApp is a user-initiated hand-off to WhatsApp Desktop
+   (`whatsapp://send?`) or the owner's own browser (`https://wa.me/`)
+   via `os.startfile`/`webbrowser.open`, with a clipboard-copy fallback
+   if that fails — never an HTTP request this process makes. No
+   telemetry, no auto-update, no accounts, no analytics, no crash
+   reporting. `os.startfile`/`webbrowser.open` are confined to
+   `whatsapp.py`, `update_check_panel.py` (open the download page), and
+   `export_panel.py` (open a local export folder — not a network call);
+   `urllib.request` stays confined to `update_check.py`. See
+   `tests/test_policy.py`.
 2. **Target OS**: Windows 7 SP1 64-bit AND Windows 10 64-bit, from one
    codebase. Windows 7 needs the Universal C Runtime update (KB2999226)
    installed — this is a Windows prerequisite, not something the app can
@@ -88,11 +98,11 @@ This file covers engineering rules and conventions.
       i18n/              ar.py — all Arabic strings
       utils/             money.py, time_utils.py, business_date.py, pin_hash.py,
                          single_instance.py, paths.py
-      updates/           update_check.py (only networking file), version_logic.py (pure)
+      updates/           update_check.py, version_logic.py (pure)
+      integrations/      whatsapp.py (the other allowed networking-adjacent file)
     features/
       auth/ settings/ shell/              <- built in Phase 1
-      menu/ pos/ tables/ playstation/ expenses/ reports/
-      closing/                            <- empty, README.md "Phase N" placeholder
+      menu/ pos/ tables/ playstation/ expenses/ reports/ closing/
   assets/fonts/          Cairo font + OFL license
   tests/
   ```

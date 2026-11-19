@@ -35,23 +35,26 @@ def test_login_screen_succeeds_with_correct_pin(qapp, db_conn):
     assert received[0]["id"] == user_id
 
 
-def test_main_window_hides_sections_for_cashier(qapp, db_conn):
+def test_main_window_hides_sections_for_cashier(qapp, db_conn, tmp_path):
     owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
     cashier_id = users_repo.create_user(db_conn, "Cashier", users_repo.ROLE_CASHIER, "2222")
     owner_row = users_repo.get_user(db_conn, owner_id)
     cashier_row = users_repo.get_user(db_conn, cashier_id)
+    db_path = tmp_path / "test_derby.db"  # the exact file db_conn is backed by
 
     from derby.features.shell.idle_filter import IdleTimer
 
-    owner_window = MainWindow(db_conn, owner_row, IdleTimer())
+    owner_window = MainWindow(db_conn, owner_row, IdleTimer(), db_path)
     assert "settings" in owner_window._screens
     assert "expenses" in owner_window._screens
     assert "reports" in owner_window._screens
     assert "menu" in owner_window._screens
+    assert owner_window._closing_banner is not None
 
-    cashier_window = MainWindow(db_conn, cashier_row, IdleTimer())
+    cashier_window = MainWindow(db_conn, cashier_row, IdleTimer(), db_path)
     assert "settings" not in cashier_window._screens
     assert "expenses" not in cashier_window._screens
     assert "reports" not in cashier_window._screens
     assert "menu" not in cashier_window._screens
     assert "pos" in cashier_window._screens
+    assert cashier_window._closing_banner is None

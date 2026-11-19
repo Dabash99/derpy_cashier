@@ -4,11 +4,14 @@ swaps between the feature screens the current role is allowed to see.
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from derby.core.db import settings_repo
+from derby.features.auth import permissions
+from derby.features.closing.closing_banner import ClosingBannerWidget
 from derby.features.expenses.expenses_screen import ExpensesScreen
 from derby.features.menu.menu_screen import MenuScreen
 from derby.features.playstation.playstation_screen import PlaystationScreen
@@ -31,12 +34,14 @@ class MainWindow(QMainWindow):
         conn: sqlite3.Connection,
         user: sqlite3.Row,
         idle_timer: IdleTimer,
+        db_path: Path,
         parent: QWidget = None,
     ) -> None:
         super().__init__(parent)
         self._conn = conn
         self._user = user
         self._idle_timer = idle_timer
+        self._db_path = db_path
         self._screens = {}
 
         cafe_name = settings_repo.get(conn, "cafe_name", "") or ""
@@ -54,6 +59,11 @@ class MainWindow(QMainWindow):
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.setSpacing(0)
         outer_layout.addWidget(self._header)
+
+        self._closing_banner = None
+        if permissions.view_reports(user["role"]):
+            self._closing_banner = ClosingBannerWidget(conn, user)
+            outer_layout.addWidget(self._closing_banner)
 
         body_layout = QHBoxLayout()
         body_layout.setContentsMargins(0, 0, 0, 0)
@@ -74,7 +84,8 @@ class MainWindow(QMainWindow):
             if not allowed(self._user["role"]):
                 continue
             if key == "settings":
-                widget = SettingsScreen(self._conn, self._user["id"])
+                widget = SettingsScreen(self._conn, self._user, self._db_path)
+                widget._backup_closing_panel.closed_today.connect(self._on_closing_changed)
             elif key == "menu":
                 widget = MenuScreen(self._conn, self._user["id"])
             elif key == "pos":
@@ -102,6 +113,10 @@ class MainWindow(QMainWindow):
             playstation_screen = self._screens.get("playstation")
             if playstation_screen is not None:
                 playstation_screen.order_opened.connect(self._on_order_opened_from_tables)
+
+    def _on_closing_changed(self) -> None:
+        if self._closing_banner is not None:
+            self._closing_banner.reload()
 
     def _on_order_opened_from_tables(self, order_id: int) -> None:
         pos_screen = self._screens.get("pos")

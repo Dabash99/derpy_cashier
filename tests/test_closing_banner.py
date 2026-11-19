@@ -56,3 +56,24 @@ def test_old_backup_warning_shown_when_nothing_backed_up_yet(qapp, db_conn):
     owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
     banner = ClosingBannerWidget(db_conn, users_repo.get_user(db_conn, owner_id))
     assert banner._rows_layout.count() == 1  # just the old-backup warning, no closures
+
+
+def test_whatsapp_button_uses_the_configured_method(qapp, db_conn, monkeypatch):
+    _suppress_old_backup_warning(db_conn)
+    calls = []
+    monkeypatch.setattr("derby.core.integrations.whatsapp.webbrowser.open", lambda url: calls.append(url) or True)
+    monkeypatch.setattr(
+        "derby.core.integrations.whatsapp.os.startfile",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not call startfile when method is browser")),
+    )
+    owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
+    settings_repo.set_value(db_conn, "whatsapp_number", "201234567890")
+    settings_repo.set_value(db_conn, "whatsapp_method", "browser")
+    closure_id = day_closures_repo.create_closure(db_conn, "2026-01-10", "auto", "نص", 3, 5000, 0, 5000, 0, 0)
+    closure = day_closures_repo.get_closure(db_conn, closure_id)
+
+    banner = ClosingBannerWidget(db_conn, users_repo.get_user(db_conn, owner_id))
+    banner._on_send(closure, banner._configured_method())
+    assert len(calls) == 1
+    status_label = banner._status_label_by_closure_id[closure_id]
+    assert status_label.text() != ""

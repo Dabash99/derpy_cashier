@@ -11,6 +11,7 @@ from typing import Optional
 
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -293,6 +294,9 @@ class BackupClosingPanel(QWidget):
         dialog = RestoreDialog(self._conn, self._user, self._primary_dir(), parent=self)
         if dialog.exec_() == dialog.Accepted:
             QMessageBox.information(self, ar.RESTORE_TITLE, ar.RESTORE_SUCCESS_RESTART)
+            app = QApplication.instance()
+            if app is not None:
+                app.quit()
 
     def _on_open_list(self) -> None:
         dialog = ClosuresListDialog(self._conn, self._user, self._db_path, parent=self)

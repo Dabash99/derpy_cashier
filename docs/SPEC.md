@@ -75,13 +75,19 @@ discussion history — just the decisions that shape the build.
    timers are computed from a UTC `started_at` so they survive an app
    restart.
 5. Printing — deferred; no printer integration yet.
-6. **Expenses, reports, profit, export to Excel/CSV/PDF** (this phase) —
+6. **Expenses, reports, profit, export to Excel/CSV/PDF** (done) —
    expense categories/recurring templates/receipts, a shared
    `report_service` used by the daily/monthly/custom-range views and by
    CSV/Excel/PDF export.
-7. Daily closing + backup (to the configured primary/secondary folders,
-   including the `images` folder) + WhatsApp report send (manual, via
-   `whatsapp_number` setting).
+7. **Daily closing + backup + restore + WhatsApp report** (this phase) —
+   a 30s scheduler plus startup catch-up builds and backs up each due
+   business date (to the primary/secondary folders, including the
+   `images`/`receipts` mirror), verifies every backup (integrity check +
+   row counts), rotates old ones, flags a closure stale if its totals
+   change afterward, and hands the report text to WhatsApp Desktop/the
+   browser/the clipboard (manual, via `whatsapp_number`/`whatsapp_method`).
+   Restore is staged (marker + a safety copy) and applied at the next
+   startup, before the database is opened.
 8. Delivery — PyInstaller exe for Windows 7/10, installer, real-PC tests,
    a short user guide.
 
