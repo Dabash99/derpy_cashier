@@ -1,12 +1,22 @@
-"""Builds the app-wide Qt stylesheet.
+"""Builds the single app-wide Qt stylesheet from derby/core/theme/tokens.py.
 
-No gradients, shadows, or transition effects — those are the kind of
-GPU-ish work that visibly lags on old office PCs. Buttons and inputs are
-sized generously (big tap targets) since a touchscreen may be used.
+No gradients, shadows (QGraphicsEffect), or transition effects — those
+visibly lag on old office PCs with weak/no GPU. Buttons and inputs are
+sized generously (big tap targets) since the PlayStation corner's device
+may be used from a touchscreen.
+
+Backward-compatible selectors already used across every screen keep
+working unchanged: role="title"/"subtitle"/"error" on QLabel, danger="true"
+and flat="true" on QPushButton, active="true"/"false" on sidebar buttons,
+and the #Sidebar/#Header object names. `variant="..."` is the newer,
+broader hook (primary/secondary/ghost/card/chip/badge/table) screens can
+opt into per docs/BRAND.md's visual language; a QPushButton with no
+variant set still renders as primary (amber fill, black text), since
+that's the dominant action style in a cashier-first app.
 """
 from __future__ import annotations
 
-from derby.core.theme import colors
+from derby.core.theme import tokens
 
 FONT_FAMILY = "Cairo"
 
@@ -15,7 +25,7 @@ def build_stylesheet() -> str:
     return """
     * {{
         font-family: "{font}";
-        font-size: 15px;
+        font-size: {font_size_body}px;
         color: {text_primary};
     }}
 
@@ -27,57 +37,96 @@ def build_stylesheet() -> str:
         background-color: {background};
     }}
 
+    /* ---- Buttons --------------------------------------------------- */
+
     QPushButton {{
-        background-color: {accent};
-        color: {text_on_accent};
+        background-color: {primary_fill};
+        color: {primary_text};
         border: none;
-        border-radius: 6px;
-        padding: 12px 20px;
-        min-height: 28px;
+        border-radius: {radius_md}px;
+        padding: {space_2}px {space_4}px;
+        min-height: {control_height_default}px;
+        font-weight: 600;
+    }}
+
+    QPushButton[variant="primary"] {{
+        min-height: {control_height_primary}px;
+        font-size: {font_size_subtitle}px;
     }}
 
     QPushButton:hover {{
-        background-color: {accent};
+        background-color: {primary_fill_hover};
     }}
 
     QPushButton:pressed {{
-        background-color: {accent_pressed};
+        background-color: {primary_fill_pressed};
     }}
 
     QPushButton:disabled {{
-        background-color: {border};
-        color: {text_secondary};
+        background-color: {disabled_fill};
+        color: {disabled_text};
     }}
 
-    QPushButton[flat="true"] {{
+    QPushButton[variant="secondary"] {{
+        background-color: {secondary_fill};
+        color: {secondary_text};
+    }}
+
+    QPushButton[variant="secondary"]:hover {{
+        background-color: {secondary_fill_hover};
+    }}
+
+    QPushButton[variant="secondary"]:pressed {{
+        background-color: {secondary_fill_pressed};
+    }}
+
+    QPushButton[flat="true"], QPushButton[variant="ghost"] {{
         background-color: transparent;
-        color: {text_primary};
-        border: 1px solid {border};
+        color: {ghost_text};
+        border: 1px solid {ghost_border};
+        font-weight: 500;
     }}
 
-    QPushButton[danger="true"] {{
+    QPushButton[flat="true"]:hover, QPushButton[variant="ghost"]:hover {{
+        background-color: {surface_border};
+    }}
+
+    QPushButton[danger="true"], QPushButton[variant="danger"] {{
+        background-color: {danger};
+        color: {white};
+    }}
+
+    QPushButton[danger="true"]:hover, QPushButton[variant="danger"]:hover {{
         background-color: {danger};
     }}
 
-    QPushButton[danger="true"]:pressed {{
+    QPushButton[danger="true"]:pressed, QPushButton[variant="danger"]:pressed {{
         background-color: {danger_pressed};
     }}
 
+    /* ---- Inputs ------------------------------------------------------ */
+
     QLineEdit, QComboBox, QSpinBox {{
         background-color: {surface};
-        border: 1px solid {border};
-        border-radius: 6px;
-        padding: 10px 12px;
-        min-height: 24px;
+        border: 1px solid {surface_border};
+        border-radius: {radius_md}px;
+        padding: {space_2}px {space_3}px;
+        min-height: {control_height_input}px;
     }}
+
+    QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
+        border: 1px solid {primary_fill};
+    }}
+
+    /* ---- Labels -------------------------------------------------- */
 
     QLabel {{
         background-color: transparent;
     }}
 
     QLabel[role="title"] {{
-        font-size: 20px;
-        font-weight: bold;
+        font-size: {font_size_title}px;
+        font-weight: 700;
     }}
 
     QLabel[role="subtitle"] {{
@@ -88,46 +137,135 @@ def build_stylesheet() -> str:
         color: {danger};
     }}
 
-    #Sidebar {{
+    QLabel[variant="chip"] {{
+        background-color: {surface};
+        border: 1px solid {surface_border};
+        border-radius: {radius_pill}px;
+        padding: {space_1}px {space_3}px;
+    }}
+
+    QLabel[variant="badge"] {{
+        background-color: {amber_100};
+        color: {text_on_amber};
+        border-radius: {radius_sm}px;
+        padding: 2px {space_2}px;
+        font-weight: 600;
+    }}
+
+    /* ---- Cards / surfaces ------------------------------------------- */
+
+    QFrame[variant="card"], QWidget[variant="card"] {{
+        background-color: {surface};
+        border: 1px solid {surface_border};
+        border-radius: {radius_lg}px;
+    }}
+
+    /* ---- Sidebar / header -------------------------------------------- */
+
+    #Sidebar, QWidget[variant="sidebar"] {{
         background-color: {sidebar_background};
     }}
 
-    #Sidebar QPushButton {{
+    #Sidebar QPushButton, QWidget[variant="sidebar"] QPushButton {{
         background-color: transparent;
-        color: {sidebar_text};
+        color: {text_on_dark};
         text-align: right;
-        border-radius: 6px;
-        padding: 14px 18px;
-        font-size: 16px;
+        border-radius: {radius_md}px;
+        padding: {space_3}px {space_4}px;
+        font-size: {font_size_subtitle}px;
+        font-weight: 500;
     }}
 
-    #Sidebar QPushButton:hover {{
+    #Sidebar QPushButton:hover, QWidget[variant="sidebar"] QPushButton:hover {{
         background-color: {sidebar_active};
     }}
 
-    #Sidebar QPushButton[active="true"] {{
+    #Sidebar QPushButton[active="true"], QWidget[variant="sidebar"] QPushButton[active="true"] {{
         background-color: {sidebar_active};
-        color: {sidebar_text};
-        font-weight: bold;
+        color: {amber_500};
+        font-weight: 700;
+        border-right: 3px solid {amber_500};
     }}
 
-    #Header {{
+    #Header, QWidget[variant="header"] {{
+        background-color: {header_background};
+        color: {text_on_dark};
+    }}
+
+    #Header QLabel, QWidget[variant="header"] QLabel {{
+        color: {text_on_dark};
+    }}
+
+    #Header QLabel[role="subtitle"], QWidget[variant="header"] QLabel[role="subtitle"] {{
+        color: {text_on_dark_muted};
+    }}
+
+    /* ---- Tables -------------------------------------------------- */
+
+    QTableWidget, QTableView, QWidget[variant="table"] {{
         background-color: {surface};
-        border-bottom: 1px solid {border};
+        alternate-background-color: {background};
+        gridline-color: {surface_border};
+        border: 1px solid {surface_border};
+        border-radius: {radius_md}px;
+    }}
+
+    QHeaderView::section {{
+        background-color: {background};
+        color: {text_secondary};
+        border: none;
+        border-bottom: 1px solid {surface_border};
+        padding: {space_2}px {space_3}px;
+        font-weight: 600;
+    }}
+
+    QTableWidget::item, QTableView::item {{
+        min-height: {control_height_row}px;
+        padding: {space_1}px {space_2}px;
     }}
     """.format(
         font=FONT_FAMILY,
-        text_primary=colors.TEXT_PRIMARY,
-        text_secondary=colors.TEXT_SECONDARY,
-        text_on_accent=colors.TEXT_ON_ACCENT,
-        background=colors.BACKGROUND,
-        surface=colors.SURFACE,
-        border=colors.BORDER,
-        accent=colors.ACCENT,
-        accent_pressed=colors.ACCENT_PRESSED,
-        danger=colors.DANGER,
-        danger_pressed=colors.DANGER_PRESSED,
-        sidebar_background=colors.SIDEBAR_BACKGROUND,
-        sidebar_text=colors.SIDEBAR_TEXT,
-        sidebar_active=colors.SIDEBAR_ACTIVE,
+        font_size_body=tokens.FONT_SIZE_BODY,
+        font_size_title=tokens.FONT_SIZE_TITLE,
+        font_size_subtitle=tokens.FONT_SIZE_SUBTITLE,
+        text_primary=tokens.TEXT_PRIMARY,
+        text_secondary=tokens.TEXT_SECONDARY,
+        text_on_dark=tokens.TEXT_ON_DARK,
+        text_on_dark_muted=tokens.TEXT_ON_DARK_MUTED,
+        text_on_amber=tokens.TEXT_ON_AMBER,
+        background=tokens.BACKGROUND,
+        surface=tokens.SURFACE,
+        surface_border=tokens.SURFACE_BORDER,
+        white=tokens.WHITE,
+        amber_100=tokens.AMBER_100,
+        amber_500=tokens.AMBER_500,
+        primary_fill=tokens.PRIMARY_FILL,
+        primary_fill_hover=tokens.PRIMARY_FILL_HOVER,
+        primary_fill_pressed=tokens.PRIMARY_FILL_PRESSED,
+        primary_text=tokens.PRIMARY_TEXT,
+        secondary_fill=tokens.SECONDARY_FILL,
+        secondary_fill_hover=tokens.SECONDARY_FILL_HOVER,
+        secondary_fill_pressed=tokens.SECONDARY_FILL_PRESSED,
+        secondary_text=tokens.SECONDARY_TEXT,
+        ghost_text=tokens.GHOST_TEXT,
+        ghost_border=tokens.GHOST_BORDER,
+        danger=tokens.DANGER,
+        danger_pressed=tokens.DANGER_PRESSED,
+        disabled_fill=tokens.DISABLED_FILL,
+        disabled_text=tokens.DISABLED_TEXT,
+        sidebar_background=tokens.SIDEBAR_BACKGROUND,
+        sidebar_active=tokens.SIDEBAR_ACTIVE,
+        header_background=tokens.HEADER_BACKGROUND,
+        radius_sm=tokens.RADIUS_SM,
+        radius_md=tokens.RADIUS_MD,
+        radius_lg=tokens.RADIUS_LG,
+        radius_pill=tokens.RADIUS_PILL,
+        space_1=tokens.SPACE_1,
+        space_2=tokens.SPACE_2,
+        space_3=tokens.SPACE_3,
+        space_4=tokens.SPACE_4,
+        control_height_primary=tokens.CONTROL_HEIGHT_PRIMARY,
+        control_height_default=tokens.CONTROL_HEIGHT_DEFAULT,
+        control_height_input=tokens.CONTROL_HEIGHT_INPUT,
+        control_height_row=tokens.CONTROL_HEIGHT_ROW,
     )
