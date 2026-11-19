@@ -27,8 +27,14 @@ def test_mark_sent_updates_status(qapp, db_conn, tmp_path):
 
 
 def test_rebuild_increments_revision(qapp, db_conn, tmp_path):
+    from derby.core.db import settings_repo
+
     owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
     closure_id = day_closures_repo.create_closure(db_conn, "2026-01-10", "auto", "نص", 3, 5000, 0, 5000, 0, 0)
+    # _on_rebuild backs up to whatever backup_folder_primary is set to --
+    # pin it to a tmp folder explicitly (on top of the autouse conftest
+    # safety net) so this test's intent is unambiguous.
+    settings_repo.set_value(db_conn, "backup_folder_primary", str(tmp_path / "primary"))
 
     dialog = ClosuresListDialog(db_conn, users_repo.get_user(db_conn, owner_id), tmp_path / "test_derby.db")
     dialog._table.selectRow(0)

@@ -18,7 +18,16 @@ DEFAULTS: Dict[str, str] = {
     "rounding_step_egp": "5",
     "ps_long_session_hours": "6",
     "whatsapp_number": "",
-    "backup_folder_primary": str(default_backup_dir()),
+    # backup_folder_primary is intentionally NOT a static value here: it
+    # must be resolved by calling default_backup_dir() at ensure_defaults()
+    # time (see below), not baked in once when this module is first
+    # imported -- a module-level call would freeze whatever %USERPROFILE%
+    # happened to be for the rest of the process, which breaks both
+    # production (the user's profile can't change mid-run anyway, but it's
+    # still the wrong layer for it) and, much more importantly, test
+    # isolation: monkeypatching default_backup_dir per test would have no
+    # effect on an already-computed module-level constant.
+    "backup_folder_primary": "",
     "backup_folder_secondary": "",
     "auto_lock_minutes": "10",
     "update_manifest_url": "",
@@ -41,6 +50,13 @@ def ensure_defaults(conn: sqlite3.Connection) -> None:
             "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING",
             (key, value),
         )
+    # Resolved now (not baked into DEFAULTS above) so it reflects whatever
+    # default_backup_dir() returns in THIS process/test, not whatever it
+    # returned the first time derby.core.db.settings_repo was imported.
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES ('backup_folder_primary', ?) ON CONFLICT(key) DO NOTHING",
+        (str(default_backup_dir()),),
+    )
     conn.commit()
 
 

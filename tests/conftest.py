@@ -21,6 +21,21 @@ from derby.core.db.connection import connect  # noqa: E402
 from derby.core.db.migrations import run_pending_migrations  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _never_touch_real_documents_folder(tmp_path, monkeypatch):
+    """Safety net, on every single test: derby/core/utils/paths.py's
+    default_backup_dir()/default_export_dir() read %USERPROFILE%, which
+    this process does not otherwise sandbox -- a test that forgets to
+    override a backup/export folder setting explicitly would silently
+    write into the real Documents\\Derby folder. Redirect both to a
+    per-test tmp_path instead, no matter what any individual test does.
+    """
+    fake_documents_derby = tmp_path / "fake_documents_derby"
+    monkeypatch.setattr("derby.core.utils.paths.default_backup_dir", lambda: fake_documents_derby / "Backups")
+    monkeypatch.setattr("derby.core.utils.paths.default_export_dir", lambda: fake_documents_derby / "Exports")
+    monkeypatch.setattr("derby.core.db.settings_repo.default_backup_dir", lambda: fake_documents_derby / "Backups")
+
+
 @pytest.fixture()
 def db_conn(tmp_path):
     conn = connect(tmp_path / "test_derby.db")
