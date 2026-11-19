@@ -15,6 +15,7 @@ import derby
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DERBY_DIR = PROJECT_ROOT / "derby"
+PATHS_FILE = DERBY_DIR / "core" / "utils" / "paths.py"
 ALLOWED_NETWORKING_FILE = DERBY_DIR / "core" / "updates" / "update_check.py"
 WHATSAPP_FILE = DERBY_DIR / "core" / "integrations" / "whatsapp.py"
 # os.startfile/webbrowser.open are a user-initiated hand-off, not a network
@@ -60,7 +61,18 @@ FORBIDDEN_IMPORT_SUBSTRINGS = [
     "QtMultimedia",
     "Qt3D",
     "QtCharts",
+    "QtSvg",
 ]
+
+# Real per-user Windows locations. Only derby/core/utils/paths.py is allowed
+# to read these -- everything else must go through its functions (and
+# honor DERBY_DATA_DIR/DERBY_DOCS_DIR), so a stray module can never leak
+# into the real %APPDATA%\Derby or Documents\Derby. See the docstring at
+# the top of paths.py and the "Fix: backup_folder_primary leaked into the
+# real Documents\Derby folder" commit this guards against.
+REAL_USER_PATH_ACCESS_PATTERN = re.compile(
+    r'os\.environ(?:\.get)?\s*[\(\[]\s*["\'](APPDATA|USERPROFILE)["\']|os\.getenv\s*\(\s*["\'](APPDATA|USERPROFILE)["\']|Path\.home\(\)'
+)
 
 IMPORT_PATTERN = re.compile(r"^\s*(?:import|from)\s+([\w\.]+)", re.MULTILINE)
 MATCH_STATEMENT_PATTERN = re.compile(r"^\s*match\s+.+:\s*$", re.MULTILINE)
@@ -157,6 +169,23 @@ def test_no_match_statements():
     for file_path in _all_derby_py_files():
         text = file_path.read_text(encoding="utf-8")
         if MATCH_STATEMENT_PATTERN.search(text):
+            offenders.append(str(file_path.relative_to(PROJECT_ROOT)))
+    assert offenders == []
+
+
+def test_no_real_user_path_computed_outside_paths_py():
+    """derby/core/utils/paths.py is the ONLY module allowed to read
+    %APPDATA%/%USERPROFILE% (directly or via Path.home()) -- every other
+    module must call its functions instead, which also honor the
+    DERBY_DATA_DIR/DERBY_DOCS_DIR test/tool overrides. A module that reads
+    these itself would bypass that override and risk writing into the
+    real user folders during a test, preview, or --selftest run."""
+    offenders = []
+    for file_path in _all_derby_py_files():
+        if file_path == PATHS_FILE:
+            continue
+        text = file_path.read_text(encoding="utf-8")
+        if REAL_USER_PATH_ACCESS_PATTERN.search(text):
             offenders.append(str(file_path.relative_to(PROJECT_ROOT)))
     assert offenders == []
 
