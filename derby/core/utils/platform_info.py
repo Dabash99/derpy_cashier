@@ -19,3 +19,16 @@ def default_whatsapp_method() -> str:
     if version.major == 6 and version.minor == 1:
         return "browser"
     return "desktop"
+
+
+def set_windows_app_user_model_id(app_id: str) -> None:
+    """Groups this app's windows under their own taskbar identity/icon
+    instead of Python's generic one. Must be called before any window is
+    shown. No-op outside Windows, or in a dev/test environment where
+    ctypes.windll does not exist at all."""
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+    except (AttributeError, OSError):
+        pass

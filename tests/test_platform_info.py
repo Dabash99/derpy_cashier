@@ -33,3 +33,16 @@ def test_windows_8_1_defaults_to_desktop(monkeypatch):
 def test_non_windows_defaults_to_desktop(monkeypatch):
     monkeypatch.delattr(sys, "getwindowsversion", raising=False)
     assert platform_info.default_whatsapp_method() == "desktop"
+
+
+def test_set_windows_app_user_model_id_never_raises():
+    # Real call on this (Windows) test machine, and a no-op anywhere the
+    # API doesn't exist -- either way it must never raise.
+    platform_info.set_windows_app_user_model_id("Derby.Cafe.POS.Test")
+
+
+def test_set_windows_app_user_model_id_swallows_missing_windll(monkeypatch):
+    import ctypes
+
+    monkeypatch.delattr(ctypes, "windll", raising=False)
+    platform_info.set_windows_app_user_model_id("Derby.Cafe.POS.Test")

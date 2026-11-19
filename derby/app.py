@@ -23,7 +23,7 @@ from derby.core.i18n import ar
 from derby.core.theme import icons
 from derby.core.theme.fonts import CAIRO_FAMILY, load_bundled_fonts
 from derby.core.theme.stylesheet import build_stylesheet
-from derby.core.utils import error_log
+from derby.core.utils import error_log, platform_info
 from derby.core.utils.paths import app_data_dir, database_path, default_backup_dir
 from derby.core.utils.single_instance import SingleInstanceGuard
 from derby.core.utils.time_utils import utc_now
@@ -197,10 +197,16 @@ def migrate_with_pre_backup(conn, db_path: Path):
 
 def main() -> int:
     error_log.install_exception_hook()
+    # Must run before any window is created, or Windows keeps grouping
+    # this process's taskbar entry/icon under python.exe's own identity.
+    platform_info.set_windows_app_user_model_id("Derby.Cafe.POS")
 
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
     app.setLayoutDirection(Qt.RightToLeft)
+    app.setApplicationName("Derby")
+    app.setApplicationDisplayName(ar.APP_TITLE)
+    app.setOrganizationName("Derby")
 
     load_bundled_fonts()
     app.setFont(QFont(CAIRO_FAMILY, 10))

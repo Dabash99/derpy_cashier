@@ -10,6 +10,7 @@ from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from derby.core.db import settings_repo
+from derby.core.i18n import ar
 from derby.features.auth import permissions
 from derby.features.closing.closing_banner import ClosingBannerWidget
 from derby.features.expenses.expenses_screen import ExpensesScreen
@@ -38,6 +39,8 @@ class MainWindow(QMainWindow):
         parent: QWidget = None,
     ) -> None:
         super().__init__(parent)
+        self.setWindowTitle(ar.APP_TITLE)
+        self.setMinimumSize(1024, 680)
         self._conn = conn
         self._user = user
         self._idle_timer = idle_timer

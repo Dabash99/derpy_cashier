@@ -5,7 +5,7 @@ find and tweak wording later without touching any logic.
 """
 from __future__ import annotations
 
-APP_TITLE = "ديربي"
+APP_TITLE = "Derby — ديربي"
 
 # --- First-run setup screen ---------------------------------------------
 SETUP_TITLE = "إعداد البرنامج لأول مرة"

@@ -70,6 +70,15 @@ def test_sidebar_text_renders_inside_the_real_main_window(qapp, db_conn, tmp_pat
     )
 
 
+def test_main_window_title_and_minimum_size(qapp, db_conn, tmp_path):
+    from derby.core.i18n import ar
+
+    mw = _build_shown_main_window(qapp, db_conn, tmp_path)
+    assert mw.windowTitle() == ar.APP_TITLE
+    assert mw.minimumWidth() >= 1024
+    assert mw.minimumHeight() >= 680
+
+
 def test_header_text_renders_inside_the_real_main_window(qapp, db_conn, tmp_path):
     from derby.core.db import settings_repo
 
