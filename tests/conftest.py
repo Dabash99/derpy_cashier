@@ -20,20 +20,37 @@ from derby.core.db import settings_repo  # noqa: E402
 from derby.core.db.connection import connect  # noqa: E402
 from derby.core.db.migrations import run_pending_migrations  # noqa: E402
 
+# Every module that does `from derby.core.utils.paths import
+# default_backup_dir` (or default_export_dir) binds that name into its
+# OWN namespace -- patching derby.core.utils.paths.default_backup_dir
+# alone does NOT affect those already-bound references. Every such
+# module must be patched individually, by its own dotted path.
+_BACKUP_DIR_PATCH_TARGETS = (
+    "derby.core.utils.paths.default_backup_dir",
+    "derby.core.db.settings_repo.default_backup_dir",
+    "derby.features.closing.closures_list_dialog.default_backup_dir",
+    "derby.features.closing.restore_dialog.default_backup_dir",
+)
+_EXPORT_DIR_PATCH_TARGETS = (
+    "derby.core.utils.paths.default_export_dir",
+    "derby.features.reports.export_panel.default_export_dir",
+)
+
 
 @pytest.fixture(autouse=True)
 def _never_touch_real_documents_folder(tmp_path, monkeypatch):
-    """Safety net, on every single test: derby/core/utils/paths.py's
-    default_backup_dir()/default_export_dir() read %USERPROFILE%, which
-    this process does not otherwise sandbox -- a test that forgets to
-    override a backup/export folder setting explicitly would silently
-    write into the real Documents\\Derby folder. Redirect both to a
+    """Safety net, on every single test: default_backup_dir()/
+    default_export_dir() read %USERPROFILE%, which this process does not
+    otherwise sandbox -- a test that forgets to override a backup/export
+    folder setting explicitly would silently write into the real
+    Documents\\Derby folder. Redirect every known call site to a
     per-test tmp_path instead, no matter what any individual test does.
     """
     fake_documents_derby = tmp_path / "fake_documents_derby"
-    monkeypatch.setattr("derby.core.utils.paths.default_backup_dir", lambda: fake_documents_derby / "Backups")
-    monkeypatch.setattr("derby.core.utils.paths.default_export_dir", lambda: fake_documents_derby / "Exports")
-    monkeypatch.setattr("derby.core.db.settings_repo.default_backup_dir", lambda: fake_documents_derby / "Backups")
+    for target in _BACKUP_DIR_PATCH_TARGETS:
+        monkeypatch.setattr(target, lambda: fake_documents_derby / "Backups")
+    for target in _EXPORT_DIR_PATCH_TARGETS:
+        monkeypatch.setattr(target, lambda: fake_documents_derby / "Exports")
 
 
 @pytest.fixture()

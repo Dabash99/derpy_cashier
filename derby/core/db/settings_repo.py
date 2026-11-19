@@ -46,6 +46,8 @@ DEFAULTS: Dict[str, str] = {
 
 def ensure_defaults(conn: sqlite3.Connection) -> None:
     for key, value in DEFAULTS.items():
+        if key == "backup_folder_primary":
+            continue  # resolved below, lazily -- see the comment on DEFAULTS
         conn.execute(
             "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING",
             (key, value),
