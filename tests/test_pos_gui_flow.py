@@ -28,10 +28,16 @@ def test_full_flow_table_order_with_addons_pay_cash_invoice(qapp, db_conn):
 
     table = tables_repo.list_tables(db_conn)[0]
 
-    # 1) Open the cashier screen and start an order on the first free table.
+    # 1) Open the cashier screen and select the first free table -- lazy
+    # creation means nothing is in the database yet at this point.
     pos_screen = PosScreen(db_conn, owner)
     pos_screen._on_start_table(table["id"])
-    order = orders_repo.get_open_order_for_table(db_conn, table["id"])
+    assert orders_repo.get_open_order_for_table(db_conn, table["id"]) is None
+
+    # The first item being added is what actually materializes the order
+    # (mirrors what _on_product_clicked does internally).
+    order_id = pos_screen._materialize_pending_order()
+    order = orders_repo.get_order(db_conn, order_id)
     assert order is not None
     assert pos_screen._current_order_id == order["id"]
 
@@ -87,7 +93,9 @@ def test_pos_screen_cancel_requires_no_approval_when_empty(qapp, db_conn, monkey
 
     pos_screen = PosScreen(db_conn, owner)
     pos_screen._on_start_table(table["id"])
-    order_id = pos_screen._current_order_id
+    # Materialize the order (as the first item-add would) but leave it
+    # with zero items -- cancelling that must still skip owner approval.
+    order_id = pos_screen._materialize_pending_order()
 
     # Auto-confirm the "are you sure" dialog instead of blocking on it.
     from PySide2.QtWidgets import QMessageBox
@@ -97,3 +105,21 @@ def test_pos_screen_cancel_requires_no_approval_when_empty(qapp, db_conn, monkey
 
     order = orders_repo.get_order(db_conn, order_id)
     assert order["status"] == "cancelled"
+
+
+def test_pos_screen_cancel_on_pending_table_just_goes_back_with_no_db_row(qapp, db_conn, monkeypatch):
+    """Clicking إلغاء الطلب before ever adding an item has nothing to
+    cancel in the database -- it should just return to the chooser."""
+    owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
+    owner = users_repo.get_user(db_conn, owner_id)
+    table = tables_repo.list_tables(db_conn)[0]
+
+    pos_screen = PosScreen(db_conn, owner)
+    pos_screen._on_start_table(table["id"])
+    assert pos_screen._current_order_id is None
+
+    pos_screen._on_cancel_requested()
+
+    assert pos_screen._current_order_id is None
+    assert orders_repo.get_open_order_for_table(db_conn, table["id"]) is None
+    assert pos_screen._stack.currentWidget() is pos_screen._chooser_page

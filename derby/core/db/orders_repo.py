@@ -52,9 +52,16 @@ def get_open_order_for_device(conn: sqlite3.Connection, device_id: int) -> Optio
 
 
 def list_open_takeaway_orders(conn: sqlite3.Connection) -> List[sqlite3.Row]:
+    # table_id IS NULL also matches PlayStation device orders -- exclude
+    # those explicitly, or a running device's order shows up twice (once
+    # correctly on its PS card, once mislabeled as a takeaway row here).
     return conn.execute(
-        "SELECT * FROM orders WHERE table_id IS NULL AND status = 'open' ORDER BY opened_at_utc"
+        "SELECT * FROM orders WHERE table_id IS NULL AND device_id IS NULL AND status = 'open' ORDER BY opened_at_utc"
     ).fetchall()
+
+
+def list_open_orders(conn: sqlite3.Connection) -> List[sqlite3.Row]:
+    return conn.execute("SELECT * FROM orders WHERE status = 'open'").fetchall()
 
 
 def list_orders(

@@ -5,6 +5,7 @@ chosen (open_order), which is how the Tables screen hands off to it.
 from __future__ import annotations
 
 import sqlite3
+from typing import Optional
 
 from PySide2.QtWidgets import (
     QDialog,
@@ -37,6 +38,10 @@ class PosScreen(QWidget):
         self._conn = conn
         self._user = user
         self._current_order_id = None
+        # Set while the working page shows a table/takeaway that has no
+        # order row yet -- see _materialize_pending_order().
+        self._pending_table_id = None
+        self._pending_is_takeaway = False
 
         self._stack = QStackedWidget()
         outer = QVBoxLayout(self)
@@ -85,13 +90,51 @@ class PosScreen(QWidget):
             button.clicked.connect(lambda _checked=False, tid=table["id"]: self._on_start_table(tid))
             self._chooser_grid.addWidget(button, row, col)
 
+    def open_table(self, table_id: int) -> None:
+        """Entry point for both the chooser grid above and the Tables
+        screen's card click: an existing order is opened as-is, but a free
+        table opens a PENDING working page with no order row at all --
+        one is only created once the first item/session makes it real."""
+        order = orders_repo.get_open_order_for_table(self._conn, table_id)
+        if order is not None:
+            self.open_order(order["id"])
+            return
+        table = tables_repo.get_table(self._conn, table_id)
+        self._current_order_id = None
+        self._pending_table_id = table_id
+        self._pending_is_takeaway = False
+        self._order_label.setText(table["name"] if table is not None else "")
+        self._cart_panel.set_order(None)
+        self._stack.setCurrentWidget(self._working_page)
+
     def _on_start_table(self, table_id: int) -> None:
-        order = orders_service.get_or_create_table_order(self._conn, table_id, self._user["id"])
-        self.open_order(order["id"])
+        self.open_table(table_id)
 
     def _on_start_takeaway(self) -> None:
-        order = orders_service.create_takeaway_order(self._conn, self._user["id"])
-        self.open_order(order["id"])
+        self._current_order_id = None
+        self._pending_table_id = None
+        self._pending_is_takeaway = True
+        self._order_label.setText(ar.TABLES_TAKEAWAY_SECTION)
+        self._cart_panel.set_order(None)
+        self._stack.setCurrentWidget(self._working_page)
+
+    def _materialize_pending_order(self) -> Optional[int]:
+        """Called the moment an order actually needs to exist (first item
+        added). Returns None if there is nothing pending AND no current
+        order either (shouldn't normally happen from the UI)."""
+        if self._current_order_id is not None:
+            return self._current_order_id
+        if self._pending_is_takeaway:
+            order = orders_service.create_takeaway_order(self._conn, self._user["id"])
+        elif self._pending_table_id is not None:
+            order = orders_service.get_or_create_table_order(self._conn, self._pending_table_id, self._user["id"])
+        else:
+            return None
+        self._current_order_id = order["id"]
+        self._pending_table_id = None
+        self._pending_is_takeaway = False
+        self._cart_panel.set_order(self._current_order_id)
+        return self._current_order_id
 
     # --- working page (an order is open) --------------------------------------
 
@@ -139,6 +182,8 @@ class PosScreen(QWidget):
 
     def open_order(self, order_id: int) -> None:
         self._current_order_id = order_id
+        self._pending_table_id = None
+        self._pending_is_takeaway = False
         order = orders_repo.get_order(self._conn, order_id)
         if order["table_id"]:
             table = tables_repo.get_table(self._conn, order["table_id"])
@@ -151,8 +196,17 @@ class PosScreen(QWidget):
         self._cart_panel.set_order(order_id)
         self._stack.setCurrentWidget(self._working_page)
 
-    def _on_back_to_chooser(self) -> None:
+    def leave_screen(self) -> None:
+        """Called by MainWindow whenever navigation moves away from the
+        Cashier screen -- cleans up a pending (never materialized)
+        selection and sweeps any order that ended up open with no items."""
         self._current_order_id = None
+        self._pending_table_id = None
+        self._pending_is_takeaway = False
+        orders_service.auto_cancel_empty_open_orders(self._conn, self._user["id"])
+
+    def _on_back_to_chooser(self) -> None:
+        self.leave_screen()
         self._refresh_chooser()
         self._stack.setCurrentWidget(self._chooser_page)
 
@@ -168,10 +222,16 @@ class PosScreen(QWidget):
                 return
             addon_ids = dialog.selected_addon_ids()
 
-        orders_service.add_item(self._conn, self._current_order_id, product_id, 1, addon_ids, None, self._user["id"])
+        order_id = self._materialize_pending_order()
+        orders_service.add_item(self._conn, order_id, product_id, 1, addon_ids, None, self._user["id"])
         self._cart_panel.reload()
 
     def _on_pay_requested(self) -> None:
+        if self._current_order_id is None:
+            # Nothing was ever added -- same "empty cart" outcome as a
+            # materialized order with a zero subtotal.
+            QMessageBox.warning(self, ar.GENERIC_ERROR_TITLE, ar.POS_ERROR_EMPTY_CART_PAY)
+            return
         order = orders_repo.get_order(self._conn, self._current_order_id)
         if order["subtotal_piasters"] <= 0:
             QMessageBox.warning(self, ar.GENERIC_ERROR_TITLE, ar.POS_ERROR_EMPTY_CART_PAY)
@@ -182,11 +242,19 @@ class PosScreen(QWidget):
             self._on_back_to_chooser()
 
     def _on_discount_requested(self) -> None:
+        if self._current_order_id is None:
+            QMessageBox.information(self, ar.POS_CART_TITLE, ar.POS_EMPTY_CART)
+            return
         dialog = DiscountDialog(self._conn, self._current_order_id, self._user, parent=self)
         dialog.exec_()
         self._cart_panel.reload()
 
     def _on_cancel_requested(self) -> None:
+        if self._current_order_id is None:
+            # Nothing was ever materialized -- just leave, there is
+            # nothing in the database to cancel or approve.
+            self._on_back_to_chooser()
+            return
         confirmed = QMessageBox.question(self, ar.POS_CANCEL_CONFIRM_TITLE, ar.POS_CANCEL_CONFIRM_MESSAGE)
         if confirmed != QMessageBox.Yes:
             return

@@ -475,3 +475,39 @@ def test_is_from_previous_business_day(db_conn, owner, table, monkeypatch):
 def test_is_not_from_previous_business_day_when_opened_today(db_conn, owner, table):
     order = orders_service.get_or_create_table_order(db_conn, table["id"], owner["id"])
     assert orders_service.is_from_previous_business_day(db_conn, order) is False
+
+
+# --- auto_cancel_empty_open_orders (item E of the UI fix pass) --------------
+
+
+def test_auto_cancel_empty_open_orders_cancels_zero_item_orders(db_conn, owner, table):
+    empty_order = orders_service.get_or_create_table_order(db_conn, table["id"], owner["id"])
+
+    cancelled = orders_service.auto_cancel_empty_open_orders(db_conn, owner["id"])
+
+    assert cancelled == 1
+    assert orders_repo.get_order(db_conn, empty_order["id"])["status"] == "cancelled"
+
+
+def test_auto_cancel_empty_open_orders_keeps_orders_with_items(db_conn, owner, table, product):
+    order = orders_service.get_or_create_table_order(db_conn, table["id"], owner["id"])
+    orders_service.add_item(db_conn, order["id"], product["id"], 1, [], None, owner["id"])
+
+    cancelled = orders_service.auto_cancel_empty_open_orders(db_conn, owner["id"])
+
+    assert cancelled == 0
+    assert orders_repo.get_order(db_conn, order["id"])["status"] == "open"
+
+
+def test_auto_cancel_empty_open_orders_keeps_device_order_with_running_session(db_conn, owner):
+    from derby.core.db import ps_devices_repo
+    from derby.features.playstation import ps_service
+
+    device = ps_devices_repo.list_devices(db_conn)[0]
+    ps_devices_repo.set_rates(db_conn, device["id"], 4000, 6000)
+    session = ps_service.start_session(db_conn, device["id"], "single", owner["id"])
+
+    cancelled = orders_service.auto_cancel_empty_open_orders(db_conn, owner["id"])
+
+    assert cancelled == 0
+    assert orders_repo.get_order(db_conn, session["order_id"])["status"] == "open"

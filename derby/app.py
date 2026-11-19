@@ -35,6 +35,7 @@ from derby.features.closing.restore_service import MARKER_FILE_NAME
 from derby.features.expenses import expenses_service
 from derby.features.expenses.recurring_due_dialog import RecurringDueDialog
 from derby.features.playstation.ps_service import run_startup_consistency_check
+from derby.features.pos.orders_service import auto_cancel_empty_open_orders
 from derby.features.shell.idle_filter import IdleTimer
 from derby.features.shell.main_window import MainWindow
 
@@ -223,6 +224,7 @@ def main() -> int:
         return 1
     settings_repo.ensure_defaults(conn)
     run_startup_consistency_check(conn)  # repairs any PlayStation session stopped mid-crash; logs each repair
+    auto_cancel_empty_open_orders(conn)  # cancels any order left open with no items from a previous session
     closing_service.ensure_first_run_date(conn, utc_now())
 
     if restore_result is not None:

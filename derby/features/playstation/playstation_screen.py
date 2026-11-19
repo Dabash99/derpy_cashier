@@ -29,6 +29,7 @@ from derby.features.auth import permissions
 from derby.features.playstation import ps_service
 from derby.features.playstation.ps_adjust_start_dialog import PsAdjustStartDialog
 from derby.features.playstation.ps_device_management_panel import PsDeviceManagementPanel
+from derby.features.pos import orders_service
 from derby.features.pos.exceptions import DeviceRateNotSetError, SessionRunningError
 from derby.features.tables.move_order_dialog import MoveOrderDialog
 
@@ -90,6 +91,9 @@ class _DeviceCard(QFrame):
         self._move_button = QPushButton(ar.TABLES_MOVE_ORDER_BUTTON)
         self._move_button.clicked.connect(self._on_move)
         row2.addWidget(self._move_button)
+        self._close_empty_button = QPushButton(ar.PS_CLOSE_EMPTY_INVOICE_BUTTON)
+        self._close_empty_button.clicked.connect(self._on_close_empty_invoice)
+        row2.addWidget(self._close_empty_button)
         layout.addLayout(row2)
 
         self._error_label = QLabel("")
@@ -132,19 +136,28 @@ class _DeviceCard(QFrame):
             self._switch_button.setText(
                 ar.PS_SWITCH_TO_MULTI_BUTTON if running["mode"] == ps_service.MODE_SINGLE else ar.PS_SWITCH_TO_SINGLE_BUTTON
             )
-            self._set_buttons_visible(start=False, switch=True, stop=True, open_invoice=True, move=False)
-        elif order is not None:
+            self._set_buttons_visible(start=False, switch=True, stop=True, open_invoice=True, move=False, close_empty=False)
+        elif order is not None and orders_repo.list_order_items(self._conn, order["id"]):
             self._state_label.setText(ar.PS_STATE_STOPPED_WITH_ORDER)
             self._elapsed_label.setText("")
             self._price_label.setText("")
-            self._set_buttons_visible(start=True, switch=False, stop=False, open_invoice=True, move=True)
+            self._set_buttons_visible(start=True, switch=False, stop=False, open_invoice=True, move=True, close_empty=False)
+        elif order is not None:
+            # A leftover order with no items left (e.g. its only ps_time
+            # line was removed) -- one-click close, no approval needed.
+            self._state_label.setText(ar.PS_STATE_EMPTY_ORDER)
+            self._elapsed_label.setText("")
+            self._price_label.setText("")
+            self._set_buttons_visible(start=True, switch=False, stop=False, open_invoice=False, move=False, close_empty=True)
         else:
             self._state_label.setText(ar.PS_STATE_FREE)
             self._elapsed_label.setText("")
             self._price_label.setText("")
-            self._set_buttons_visible(start=True, switch=False, stop=False, open_invoice=False, move=False)
+            self._set_buttons_visible(start=True, switch=False, stop=False, open_invoice=False, move=False, close_empty=False)
 
-    def _set_buttons_visible(self, start: bool, switch: bool, stop: bool, open_invoice: bool, move: bool) -> None:
+    def _set_buttons_visible(
+        self, start: bool, switch: bool, stop: bool, open_invoice: bool, move: bool, close_empty: bool
+    ) -> None:
         self._start_single_button.setVisible(start)
         self._start_multi_button.setVisible(start)
         self._switch_button.setVisible(switch)
@@ -152,6 +165,7 @@ class _DeviceCard(QFrame):
         self._adjust_start_button.setVisible(stop)  # only meaningful while a session is running
         self._open_invoice_button.setVisible(open_invoice)
         self._move_button.setVisible(move)
+        self._close_empty_button.setVisible(close_empty)
 
     def _on_start(self, mode: str) -> None:
         self._error_label.setText("")
@@ -191,6 +205,13 @@ class _DeviceCard(QFrame):
         order = orders_repo.get_open_order_for_device(self._conn, self._device_id)
         if order is not None:
             self.order_opened.emit(order["id"])
+
+    def _on_close_empty_invoice(self) -> None:
+        order = orders_repo.get_open_order_for_device(self._conn, self._device_id)
+        if order is not None:
+            orders_service.cancel(self._conn, order["id"], self._user)
+            self.refresh()
+            self.state_changed.emit()
 
     def _on_move(self) -> None:
         order = orders_repo.get_open_order_for_device(self._conn, self._device_id)

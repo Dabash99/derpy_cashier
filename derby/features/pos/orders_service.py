@@ -66,6 +66,33 @@ def get_or_create_table_order(conn: sqlite3.Connection, table_id: int, user_id: 
     return orders_repo.get_order(conn, order_id)
 
 
+def auto_cancel_empty_open_orders(conn: sqlite3.Connection, actor_user_id: Optional[int] = None) -> int:
+    """Safety net for lazy order creation (opening a table/takeaway no
+    longer creates a row until the first item is added): an order can
+    still end up open with zero items -- e.g. every item was removed
+    again, or the app closed mid-way through. Called once at startup and
+    whenever the Cashier screen is left. A PlayStation device order with
+    a RUNNING session is left alone even though it has no items yet
+    (its ps_time line is only added when the session stops); one with no
+    running session and no items is exactly the "leftover empty order"
+    case the PS card's own إغلاق الفاتورة action also targets -- this
+    sweep is what cleans it up if the cashier never clicks that."""
+    cancelled = 0
+    for order in orders_repo.list_open_orders(conn):
+        if orders_repo.list_order_items(conn, order["id"]):
+            continue
+        if order["device_id"] is not None and ps_sessions_repo.get_running_session(conn, order["device_id"]) is not None:
+            continue
+        try:
+            orders_repo.mark_order_cancelled(conn, order["id"], commit=False)
+            audit_repo.log(conn, "auto_cancel_empty", user_id=actor_user_id, details="order={0}".format(order["id"]))
+        except Exception:
+            conn.rollback()
+            raise
+        cancelled += 1
+    return cancelled
+
+
 def create_takeaway_order(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row:
     # Takeaway orders are never shared/reused -- every "new takeaway" click
     # starts a fresh one, unlike a table which reopens its existing order.

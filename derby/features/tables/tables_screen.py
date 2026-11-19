@@ -33,6 +33,9 @@ _GRID_COLUMNS = 4
 
 class TablesScreen(QWidget):
     order_opened = Signal(int)
+    # A free table card was clicked -- unlike order_opened, no order row
+    # exists yet (lazy creation: see PosScreen.open_table).
+    table_selected = Signal(int)
 
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
@@ -92,33 +95,65 @@ class TablesScreen(QWidget):
         card_layout = QVBoxLayout(card)
 
         order = orders_repo.get_open_order_for_table(self._conn, table["id"])
-        lines = [table["name"]]
+        has_items = order is not None and len(orders_repo.list_order_items(self._conn, order["id"])) > 0
+
         if order is None:
-            lines.append(ar.TABLES_FREE_LABEL)
-        else:
-            lines.append(ar.TABLES_BUSY_LABEL)
-            lines.append("{0}: {1}".format(ar.TABLES_TOTAL_LABEL, format_egp(order["total_piasters"])))
-            opened_cairo = to_cairo(parse_utc_iso(order["opened_at_utc"]))
-            lines.append(ar.TABLES_OPENED_AT_LABEL.format(time=opened_cairo.strftime("%H:%M")))
-            if orders_service.is_from_previous_business_day(self._conn, order):
-                lines.append(ar.POS_PREVIOUS_DAY_BADGE)
+            lines = [table["name"], ar.TABLES_FREE_LABEL]
+            open_button = QPushButton("\n".join(lines))
+            open_button.setMinimumSize(150, 110)
+            open_button.clicked.connect(lambda: self.table_selected.emit(table["id"]))
+            card_layout.addWidget(open_button)
+            return card
+
+        if not has_items:
+            # Lazily-created order that never got an item (normally swept
+            # by auto_cancel_empty_open_orders, but shown here too in case
+            # that hasn't run yet) -- a plain one-click close, no approval
+            # needed since there is nothing to lose.
+            lines = [table["name"], ar.TABLES_EMPTY_ORDER_LABEL]
+            info_label = QLabel("\n".join(lines))
+            card_layout.addWidget(info_label)
+            close_button = QPushButton(ar.TABLES_CLOSE_EMPTY_BUTTON)
+            close_button.setMinimumSize(150, 48)
+            close_button.clicked.connect(lambda: self._on_close_empty_order(order["id"]))
+            card_layout.addWidget(close_button)
+            return card
+
+        lines = [table["name"], ar.TABLES_BUSY_LABEL]
+        lines.append("{0}: {1}".format(ar.TABLES_TOTAL_LABEL, format_egp(order["total_piasters"])))
+        opened_cairo = to_cairo(parse_utc_iso(order["opened_at_utc"]))
+        lines.append(ar.TABLES_OPENED_AT_LABEL.format(time=opened_cairo.strftime("%H:%M")))
+        if orders_service.is_from_previous_business_day(self._conn, order):
+            lines.append(ar.POS_PREVIOUS_DAY_BADGE)
 
         open_button = QPushButton("\n".join(lines))
         open_button.setMinimumSize(150, 110)
-        open_button.clicked.connect(lambda: self._on_table_clicked(table["id"]))
+        open_button.clicked.connect(lambda: self.order_opened.emit(order["id"]))
         card_layout.addWidget(open_button)
 
-        if order is not None:
-            move_button = QPushButton(ar.TABLES_MOVE_ORDER_BUTTON)
-            move_button.clicked.connect(lambda: self._on_move_order(order["id"]))
-            card_layout.addWidget(move_button)
+        move_button = QPushButton(ar.TABLES_MOVE_ORDER_BUTTON)
+        move_button.clicked.connect(lambda: self._on_move_order(order["id"]))
+        card_layout.addWidget(move_button)
 
         return card
+
+    def _on_close_empty_order(self, order_id: int) -> None:
+        orders_service.cancel(self._conn, order_id, self._user)
+        self.reload()
 
     def _build_takeaway_row(self, order: sqlite3.Row) -> QWidget:
         row = QWidget()
         row_layout = QHBoxLayout(row)
         opened_cairo = to_cairo(parse_utc_iso(order["opened_at_utc"]))
+
+        if not orders_repo.list_order_items(self._conn, order["id"]):
+            label = "{0} — {1} — {2}".format(ar.TABLES_TAKEAWAY_SECTION, ar.TABLES_EMPTY_ORDER_LABEL, opened_cairo.strftime("%H:%M"))
+            row_layout.addWidget(QLabel(label))
+            close_button = QPushButton(ar.TABLES_CLOSE_EMPTY_BUTTON)
+            close_button.clicked.connect(lambda: self._on_close_empty_order(order["id"]))
+            row_layout.addWidget(close_button)
+            return row
+
         label = "{0} — {1} — {2}".format(
             ar.TABLES_TAKEAWAY_SECTION, format_egp(order["total_piasters"]), opened_cairo.strftime("%H:%M")
         )
@@ -130,10 +165,6 @@ class TablesScreen(QWidget):
         move_button.clicked.connect(lambda: self._on_move_order(order["id"]))
         row_layout.addWidget(move_button)
         return row
-
-    def _on_table_clicked(self, table_id: int) -> None:
-        order = orders_service.get_or_create_table_order(self._conn, table_id, self._user["id"])
-        self.order_opened.emit(order["id"])
 
     def _on_move_order(self, order_id: int) -> None:
         dialog = MoveOrderDialog(self._conn, order_id, self._user, parent=self)

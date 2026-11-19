@@ -114,6 +114,7 @@ class MainWindow(QMainWindow):
             tables_screen = self._screens.get("tables")
             if tables_screen is not None:
                 tables_screen.order_opened.connect(self._on_order_opened_from_tables)
+                tables_screen.table_selected.connect(self._on_table_selected_from_tables)
             playstation_screen = self._screens.get("playstation")
             if playstation_screen is not None:
                 playstation_screen.order_opened.connect(self._on_order_opened_from_tables)
@@ -128,11 +129,33 @@ class MainWindow(QMainWindow):
             pos_screen.open_order(order_id)
             self._on_navigate("pos")
 
+    def _on_table_selected_from_tables(self, table_id: int) -> None:
+        pos_screen = self._screens.get("pos")
+        if pos_screen is not None:
+            pos_screen.open_table(table_id)
+            self._on_navigate("pos")
+
     def _on_navigate(self, key: str) -> None:
+        current_key = None
+        current_widget = self._content_stack.currentWidget()
+        for screen_key, screen_widget in self._screens.items():
+            if screen_widget is current_widget:
+                current_key = screen_key
+                break
+        if current_key == "pos" and key != "pos":
+            pos_screen = self._screens.get("pos")
+            if pos_screen is not None:
+                pos_screen.leave_screen()
+
         widget = self._screens.get(key)
         if widget is not None:
             self._content_stack.setCurrentWidget(widget)
             self._sidebar.set_active(key)
+            # These two show live busy/free state that the Cashier screen
+            # (orders) and PlayStation sessions change from elsewhere, so
+            # refresh on every visit rather than only once at construction.
+            if key in ("tables", "playstation"):
+                widget.reload()
 
     def _navigate_to_default(self) -> None:
         for key, _label, _icon_name, _phase, _allowed in SECTIONS:
