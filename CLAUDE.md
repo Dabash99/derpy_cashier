@@ -120,7 +120,7 @@ This file covers engineering rules and conventions.
       selftest.py         `python -m derby --selftest` (Phase 8)
     features/
       auth/ settings/ shell/              <- built in Phase 1
-      menu/ pos/ tables/ playstation/ expenses/ reports/ closing/
+      menu/ pos/ tables/ playstation/ expenses/ reports/ closing/ supplies/
   assets/
     fonts/               Cairo + Montserrat (static weights) + OFL license
     logo/                original source logo (SVG + PNG) — never edited
