@@ -21,7 +21,7 @@ def test_pay_button_disabled_and_provisional_line_shown_while_running(qapp, db_c
     session = ps_service.start_session(db_conn, device["id"], "single", owner_id)
     panel = CartPanel(db_conn, session["order_id"], owner)
 
-    assert panel._pay_button.isEnabled() is False
+    assert panel.pay_allowed() is False
     assert panel._pay_hint_label.isHidden() is False
     assert panel._provisional_label.isHidden() is False
 
@@ -37,7 +37,7 @@ def test_pay_button_enabled_again_after_stop(qapp, db_conn):
     ps_service.stop_session(db_conn, device["id"], owner_id, now=t0 + timedelta(minutes=35))
 
     panel = CartPanel(db_conn, session["order_id"], owner)
-    assert panel._pay_button.isEnabled() is True
+    assert panel.pay_allowed() is True
     assert panel._provisional_label.isHidden() is True
 
 

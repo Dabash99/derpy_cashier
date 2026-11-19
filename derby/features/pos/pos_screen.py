@@ -99,9 +99,26 @@ class PosScreen(QWidget):
         page = QWidget()
         outer = QVBoxLayout(page)
 
+        # Order matters under RTL: Qt mirrors a QHBoxLayout so the widget
+        # added first lands at the right/start edge. "دفع" (primary) is
+        # added first so it sits closest to the start side, "رجوع" last
+        # (least prominent, a plain exit action).
         header = QHBoxLayout()
         order_label = QLabel("")
+        order_label.setProperty("role", "title")
         header.addWidget(order_label)
+        header.addStretch(1)
+
+        self._pay_button = QPushButton(ar.POS_PAY_BUTTON)
+        self._pay_button.setProperty("variant", "primary")
+        self._pay_button.clicked.connect(self._on_pay_requested)
+        header.addWidget(self._pay_button)
+
+        cancel_button = QPushButton(ar.POS_CANCEL_ORDER_BUTTON)
+        cancel_button.setProperty("danger", "true")
+        cancel_button.clicked.connect(self._on_cancel_requested)
+        header.addWidget(cancel_button)
+
         back_button = QPushButton(ar.POS_BACK_TO_TABLES_BUTTON)
         back_button.clicked.connect(self._on_back_to_chooser)
         header.addWidget(back_button)
@@ -113,9 +130,8 @@ class PosScreen(QWidget):
         body.addWidget(product_grid, 2)
 
         cart_panel = CartPanel(self._conn, order_id=0, user=self._user)
-        cart_panel.pay_requested.connect(self._on_pay_requested)
         cart_panel.discount_requested.connect(self._on_discount_requested)
-        cart_panel.cancel_requested.connect(self._on_cancel_requested)
+        cart_panel.pay_allowed_changed.connect(self._pay_button.setEnabled)
         body.addWidget(cart_panel, 1)
 
         outer.addLayout(body)

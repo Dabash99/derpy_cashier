@@ -6,6 +6,7 @@ from PySide2.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
 from derby.core.i18n import ar
 from derby.core.theme import icons
+from derby.core.theme.styled import enable_styled_background
 from derby.features.auth import permissions
 
 # (key, label, icon name in assets/brand/icons, phase-if-not-built-yet, permission check)
@@ -27,6 +28,7 @@ class Sidebar(QWidget):
     def __init__(self, role: str, parent: QWidget = None) -> None:
         super().__init__(parent)
         self.setObjectName("Sidebar")
+        enable_styled_background(self)
         self._buttons = {}
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 16, 8, 16)

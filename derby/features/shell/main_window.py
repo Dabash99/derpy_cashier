@@ -65,11 +65,15 @@ class MainWindow(QMainWindow):
             self._closing_banner = ClosingBannerWidget(conn, user)
             outer_layout.addWidget(self._closing_banner)
 
+        # Qt mirrors a QHBoxLayout's visual order under RTL layoutDirection,
+        # so the widget added FIRST lands at the reading-start edge, which is
+        # the right side in RTL. The sidebar must be added first so it sits
+        # on the right, next to the content titles.
         body_layout = QHBoxLayout()
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
-        body_layout.addWidget(self._content_stack, 1)
         body_layout.addWidget(self._sidebar)
+        body_layout.addWidget(self._content_stack, 1)
         outer_layout.addLayout(body_layout)
 
         self.setCentralWidget(central)

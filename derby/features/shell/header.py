@@ -7,6 +7,7 @@ from PySide2.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 from derby.core.db.users_repo import ROLE_OWNER
 from derby.core.i18n import ar
 from derby.core.theme import icons
+from derby.core.theme.styled import enable_styled_background
 
 
 class Header(QWidget):
@@ -15,6 +16,7 @@ class Header(QWidget):
     def __init__(self, cafe_name: str, user_name: str, role: str, parent: QWidget = None) -> None:
         super().__init__(parent)
         self.setObjectName("Header")
+        enable_styled_background(self)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(20, 12, 20, 12)
         layout.setSpacing(10)

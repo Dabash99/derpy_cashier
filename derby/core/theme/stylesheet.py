@@ -175,6 +175,11 @@ def build_stylesheet() -> str:
         border-radius: {radius_lg}px;
     }}
 
+    QWidget[variant="banner"] {{
+        background-color: {amber_100};
+        border-bottom: 1px solid {amber_300};
+    }}
+
     /* ---- Sidebar / header -------------------------------------------- */
 
     #Sidebar, QWidget[variant="sidebar"] {{
@@ -266,6 +271,7 @@ def build_stylesheet() -> str:
         surface_border=tokens.SURFACE_BORDER,
         white=tokens.WHITE,
         amber_100=tokens.AMBER_100,
+        amber_300=tokens.AMBER_300,
         amber_500=tokens.AMBER_500,
         primary_fill=tokens.PRIMARY_FILL,
         primary_fill_hover=tokens.PRIMARY_FILL_HOVER,

@@ -35,16 +35,16 @@ from derby.features.pos.owner_pin_prompt import ask_for_owner_pin
 
 
 class CartPanel(QWidget):
-    pay_requested = Signal()
     discount_requested = Signal()
-    cancel_requested = Signal()
     changed = Signal()  # fires after any successful cart mutation
+    pay_allowed_changed = Signal(bool)  # the Cashier screen's top bar "دفع" button follows this
 
     def __init__(self, conn: sqlite3.Connection, order_id: int, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
         self._order_id = order_id
         self._user = user
+        self._pay_allowed = True
         self._provisional_session_id = None
         self._provisional_timer = QTimer(self)
         self._provisional_timer.setInterval(1000)
@@ -88,20 +88,13 @@ class CartPanel(QWidget):
         self._pay_hint_label.setVisible(False)
         layout.addWidget(self._pay_hint_label)
 
+        # Pay/cancel live in the Cashier screen's top bar (clearer, always
+        # visible without scrolling the cart) -- this row only keeps the
+        # discount action, which is specific to the cart contents.
         buttons_row = QHBoxLayout()
         discount_button = QPushButton(ar.POS_DISCOUNT_BUTTON)
         discount_button.clicked.connect(self.discount_requested.emit)
         buttons_row.addWidget(discount_button)
-
-        self._pay_button = QPushButton(ar.POS_PAY_BUTTON)
-        self._pay_button.setProperty("variant", "primary")
-        self._pay_button.clicked.connect(self.pay_requested.emit)
-        buttons_row.addWidget(self._pay_button)
-
-        cancel_button = QPushButton(ar.POS_CANCEL_ORDER_BUTTON)
-        cancel_button.setProperty("danger", "true")
-        cancel_button.clicked.connect(self.cancel_requested.emit)
-        buttons_row.addWidget(cancel_button)
         layout.addLayout(buttons_row)
 
     def reload(self) -> None:
@@ -138,17 +131,23 @@ class CartPanel(QWidget):
         self._discount_label.setText("{0}: {1}".format(ar.POS_DISCOUNT_LABEL, format_egp(order["discount_piasters"])))
         self._total_label.setText("{0}: {1}".format(ar.POS_TOTAL_LABEL, format_egp(order["total_piasters"])))
 
+    def pay_allowed(self) -> bool:
+        """Whether the Cashier screen's top-bar "دفع" button should be
+        enabled -- false while a PlayStation session is still running on
+        this order (its total isn't final yet)."""
+        return self._pay_allowed
+
     def _set_running_session(self, running_session) -> None:
         self._provisional_session_id = running_session["id"] if running_session is not None else None
+        self._pay_allowed = running_session is None
+        self.pay_allowed_changed.emit(self._pay_allowed)
         if running_session is not None:
-            self._pay_button.setEnabled(False)
             self._pay_hint_label.setText(ar.POS_PS_SESSION_RUNNING_HINT)
             self._pay_hint_label.setVisible(True)
             self._provisional_label.setVisible(True)
             self._update_provisional_label()
             self._provisional_timer.start()
         else:
-            self._pay_button.setEnabled(True)
             self._pay_hint_label.setVisible(False)
             self._provisional_label.setVisible(False)
             self._provisional_timer.stop()

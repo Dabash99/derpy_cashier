@@ -12,6 +12,7 @@ from PySide2.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 from derby.core.db import day_closures_repo, settings_repo
 from derby.core.i18n import ar
 from derby.core.integrations import whatsapp
+from derby.core.theme.styled import enable_styled_background
 from derby.core.utils.time_utils import utc_now
 from derby.features.closing import closing_service
 from derby.features.closing.closing_report_viewer_dialog import ClosingReportViewerDialog
@@ -20,14 +21,23 @@ from derby.features.closing.closing_report_viewer_dialog import ClosingReportVie
 class ClosingBannerWidget(QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
+        self.setObjectName("ClosingBanner")
+        self.setProperty("variant", "banner")
+        enable_styled_background(self)
         self._conn = conn
         self._user = user
         self._status_label_by_closure_id = {}
         self._rows_layout = QVBoxLayout(self)
-        self._rows_layout.setContentsMargins(8, 4, 8, 4)
+        self._rows_layout.setContentsMargins(12, 8, 12, 8)
+        self._rows_layout.setSpacing(4)
         self.reload()
+        self.setVisible(self._rows_layout.count() > 0)
 
     def reload(self) -> None:
+        self._reload_rows()
+        self.setVisible(self._rows_layout.count() > 0)
+
+    def _reload_rows(self) -> None:
         while self._rows_layout.count():
             item = self._rows_layout.takeAt(0)
             if item.widget():
