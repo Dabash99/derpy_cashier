@@ -5,6 +5,8 @@ from __future__ import annotations
 from derby.core.db import settings_repo
 from derby.core.db.connection import connect
 from derby.core.db.migrations import run_pending_migrations
+from derby.core.utils.time_utils import utc_now
+from derby.features.closing import closing_service
 
 
 def test_settings_persist_across_reconnect(tmp_path):
@@ -36,6 +38,44 @@ def test_ensure_defaults_resolves_backup_folder_primary_lazily(tmp_path, monkeyp
     settings_repo.ensure_defaults(conn)
 
     assert settings_repo.get(conn, "backup_folder_primary") == str(sandboxed)
+    conn.close()
+
+
+def test_ensure_defaults_resolves_whatsapp_method_from_windows_version(tmp_path, monkeypatch):
+    import sys
+    import types
+
+    monkeypatch.setattr(
+        sys, "getwindowsversion", lambda: types.SimpleNamespace(major=6, minor=1), raising=False
+    )
+
+    conn = connect(tmp_path / "win7.db")
+    run_pending_migrations(conn)
+    settings_repo.ensure_defaults(conn)
+
+    assert settings_repo.get(conn, "whatsapp_method") == "browser"
+    conn.close()
+
+
+def test_ensure_defaults_does_not_override_whatsapp_method_on_a_later_run(tmp_path, monkeypatch):
+    """Only the very first ensure_defaults() may apply the Windows-version
+    default; an owner who later changes whatsapp_method (or simply
+    restarts the app) must never have it silently reset."""
+    import sys
+    import types
+
+    conn = connect(tmp_path / "existing.db")
+    run_pending_migrations(conn)
+    settings_repo.ensure_defaults(conn)  # first run: not mocked, resolves to the real platform's default
+    closing_service.ensure_first_run_date(conn, utc_now())  # same order app.py's main() calls these in
+    settings_repo.set_value(conn, "whatsapp_method", "copy_only")
+
+    monkeypatch.setattr(
+        sys, "getwindowsversion", lambda: types.SimpleNamespace(major=6, minor=1), raising=False
+    )
+    settings_repo.ensure_defaults(conn)  # simulates a later app restart, now "on Windows 7"
+
+    assert settings_repo.get(conn, "whatsapp_method") == "copy_only"
     conn.close()
 
 

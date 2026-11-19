@@ -135,6 +135,27 @@ def mirror_folder(source_dir: Path, dest_dir: Path) -> int:
     return copied
 
 
+def verified_pre_migration_backup(conn: sqlite3.Connection, db_path: Path, dest_dir: Path, now) -> Path:
+    """Phase 8 safety net: before migrating an EXISTING database (called
+    only when PRAGMA user_version is already > 0 and below the current
+    schema version -- a brand-new db at version 0 needs no backup), take
+    a verified backup first. Raises BackupError (same class a normal
+    manual/daily backup raises) if the backup cannot be taken or does not
+    verify -- the caller must NOT proceed with the migration in that
+    case, matching the "never migrate without a working backup" rule.
+    """
+    from derby.core.db.migrations import MIGRATIONS  # local import: migrations.py never imports this module
+
+    from_version = conn.execute("PRAGMA user_version").fetchone()[0]
+    to_version = len(MIGRATIONS)
+    snapshot = take_snapshot(conn)
+    file_name = "derby-pre-migration-v{0}-to-v{1}-{2}.db".format(from_version, to_version, now.strftime("%Y%m%d-%H%M%S"))
+    dest_path = Path(dest_dir) / file_name
+    backup_to_file(db_path, dest_path)
+    verify_backup(dest_path, snapshot)
+    return dest_path
+
+
 def rotate_backups(folder: Path, pattern: "re.Pattern", keep_count: int) -> List[Path]:
     """Deletes the oldest files matching `pattern` beyond `keep_count`.
     Only ever touches files matching the exact pattern -- nothing else in

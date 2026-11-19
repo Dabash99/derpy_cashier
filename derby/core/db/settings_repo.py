@@ -10,6 +10,7 @@ import sqlite3
 from typing import Dict, Optional
 
 from derby.core.utils.paths import default_backup_dir
+from derby.core.utils.platform_info import default_whatsapp_method
 
 DEFAULTS: Dict[str, str] = {
     "cafe_name": "",
@@ -38,27 +39,58 @@ DEFAULTS: Dict[str, str] = {
     # Daily closing / backup (Phase 7).
     "closing_enabled": "1",
     "backup_keep_count": "30",
-    "whatsapp_method": "desktop",
+    # whatsapp_method is intentionally NOT a static value here either --
+    # same reasoning as backup_folder_primary above: it must reflect
+    # sys.getwindowsversion() at ensure_defaults() time (Windows 7 has no
+    # WhatsApp Desktop), not whatever platform this module happened to be
+    # first imported on.
+    "whatsapp_method": "",
     "last_exit_backup_utc": "",
     "app_first_run_date": "",
 }
 
 
+_LAZY_DEFAULTS = {
+    "backup_folder_primary": lambda: str(default_backup_dir()),
+    "whatsapp_method": default_whatsapp_method,
+}
+
+
 def ensure_defaults(conn: sqlite3.Connection) -> None:
     for key, value in DEFAULTS.items():
-        if key == "backup_folder_primary":
+        if key in _LAZY_DEFAULTS:
             continue  # resolved below, lazily -- see the comment on DEFAULTS
         conn.execute(
             "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING",
             (key, value),
         )
-    # Resolved now (not baked into DEFAULTS above) so it reflects whatever
-    # default_backup_dir() returns in THIS process/test, not whatever it
-    # returned the first time derby.core.db.settings_repo was imported.
-    conn.execute(
-        "INSERT INTO settings (key, value) VALUES ('backup_folder_primary', ?) ON CONFLICT(key) DO NOTHING",
-        (str(default_backup_dir()),),
-    )
+    # True only the very first time ensure_defaults() ever completes for
+    # this database (app_first_run_date is set right after, by
+    # closing_service.ensure_first_run_date) -- used below so the
+    # Windows-version-aware whatsapp_method default can override the
+    # static "desktop" that migration 0006 already inserted directly
+    # (migrations are append-only and never edited, so that row already
+    # exists by the time we get here) WITHOUT ever clobbering a value the
+    # owner deliberately changed on a later run.
+    is_genuine_first_run = conn.execute(
+        "SELECT 1 FROM settings WHERE key = 'app_first_run_date' AND value != ''"
+    ).fetchone() is None
+
+    # Resolved now (not baked into DEFAULTS above) so each reflects THIS
+    # process/test's actual environment/platform, not whatever it was the
+    # first time derby.core.db.settings_repo was imported.
+    for key, resolve in _LAZY_DEFAULTS.items():
+        if key == "whatsapp_method" and is_genuine_first_run:
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, resolve()),
+            )
+            continue
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING",
+            (key, resolve()),
+        )
     conn.commit()
 
 

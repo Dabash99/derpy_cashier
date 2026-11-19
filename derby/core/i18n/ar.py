@@ -474,6 +474,14 @@ BACKUP_ERROR_COUNT_MISMATCH = "عدد السجلات في النسخة الاح�
 BACKUP_ERROR_COPY_MISMATCH = "نسخة المجلد الثاني غير مطابقة للملف الأصلي"
 BACKUP_ERROR_FOLDER_UNAVAILABLE = "تعذر الوصول إلى المجلد"
 
+# --- Pre-migration safety (Phase 8) ------------------------------------------
+PRE_MIGRATION_BACKUP_FAILED_TITLE = "تعذر تحديث البرنامج"
+PRE_MIGRATION_BACKUP_FAILED_MESSAGE = (
+    "قبل تحديث قاعدة البيانات، يحاول البرنامج أخذ نسخة احتياطية أولًا للأمان، "
+    "ولكن هذا فشل:\n{error}\n\nلم يتم تعديل بياناتك. تأكد من توفر مساحة كافية "
+    "ومن إمكانية الوصول لمجلد النسخ الاحتياطي، ثم أعد تشغيل البرنامج."
+)
+
 CLOSING_SETTINGS_TAB = "النسخ الاحتياطي والإقفال"
 CLOSING_ENABLE_LABEL = "تفعيل الإقفال اليومي"
 CLOSING_KEEP_COUNT_LABEL = "عدد النسخ المحتفظ بها"

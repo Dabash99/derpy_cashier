@@ -16,18 +16,19 @@ from PySide2.QtGui import QFont, QIcon
 from PySide2.QtWidgets import QApplication, QDialog, QLabel, QMessageBox, QStackedWidget, QVBoxLayout
 
 from derby.core.db import audit_repo, settings_repo, users_repo
+from derby.core.db import migrations as migrations_module
 from derby.core.db.connection import connect
 from derby.core.db.migrations import run_pending_migrations
 from derby.core.i18n import ar
 from derby.core.theme import icons
 from derby.core.theme.fonts import CAIRO_FAMILY, load_bundled_fonts
 from derby.core.theme.stylesheet import build_stylesheet
-from derby.core.utils.paths import app_data_dir, database_path
+from derby.core.utils.paths import app_data_dir, database_path, default_backup_dir
 from derby.core.utils.single_instance import SingleInstanceGuard
 from derby.core.utils.time_utils import utc_now
 from derby.features.auth.login_screen import LoginScreen
 from derby.features.auth.setup_screen import SetupScreen
-from derby.features.closing import closing_service, restore_service
+from derby.features.closing import backup_service, closing_service, restore_service
 from derby.features.closing.closing_worker import ClosingWorker
 from derby.features.closing.restore_service import MARKER_FILE_NAME
 from derby.features.expenses import expenses_service
@@ -171,6 +172,27 @@ class AppController:
         progress_dialog.close()
 
 
+def migrate_with_pre_backup(conn, db_path: Path):
+    """Phase 8 safety net: before migrating an EXISTING database (PRAGMA
+    user_version already > 0 and below the current schema version -- a
+    brand-new db at version 0 needs no backup, there is nothing to lose),
+    take a verified backup first. Returns None on success (migrated, or
+    no migration was needed); returns an Arabic error message, WITHOUT
+    having run the migration, if the backup could not be taken/verified.
+    No Qt here, so this is directly unit-testable.
+    """
+    current_version = conn.execute("PRAGMA user_version").fetchone()[0]
+    needs_migration = 0 < current_version < len(migrations_module.MIGRATIONS)
+    if needs_migration:
+        backup_dir = Path(settings_repo.get(conn, "backup_folder_primary") or default_backup_dir())
+        try:
+            backup_service.verified_pre_migration_backup(conn, db_path, backup_dir, utc_now())
+        except Exception as exc:
+            return ar.PRE_MIGRATION_BACKUP_FAILED_MESSAGE.format(error=str(exc))
+    run_pending_migrations(conn)
+    return None
+
+
 def main() -> int:
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
@@ -192,7 +214,10 @@ def main() -> int:
 
     db_path = database_path()
     conn = connect(db_path)
-    run_pending_migrations(conn)
+    migration_error = migrate_with_pre_backup(conn, db_path)
+    if migration_error is not None:
+        QMessageBox.critical(None, ar.PRE_MIGRATION_BACKUP_FAILED_TITLE, migration_error)
+        return 1
     settings_repo.ensure_defaults(conn)
     run_startup_consistency_check(conn)  # repairs any PlayStation session stopped mid-crash; logs each repair
     closing_service.ensure_first_run_date(conn, utc_now())
