@@ -72,6 +72,7 @@ SETTINGS_TITLE = "الإعدادات"
 SETTINGS_TAB_GENERAL = "عام"
 SETTINGS_TAB_USERS = "المستخدمون"
 SETTINGS_TAB_UPDATES = "التحديثات"
+SETTINGS_TAB_ADVANCED = "أدوات متقدمة"
 SETTINGS_SAVE_BUTTON = "حفظ"
 SETTINGS_SAVED_MESSAGE = "تم حفظ الإعدادات بنجاح"
 SETTINGS_CAFE_NAME_LABEL = "اسم الكافيه"
@@ -82,6 +83,25 @@ SETTINGS_AUTO_LOCK_LABEL = "القفل التلقائي بعد (دقيقة)"
 SETTINGS_UPDATE_URL_LABEL = "رابط ملف التحديثات"
 SETTINGS_ERROR_INVALID_NUMBER = "من فضلك اكتب رقمًا صحيحًا"
 SETTINGS_ERROR_INVALID_TIME = "من فضلك اكتب وقتًا صحيحًا بصيغة س:د"
+
+# --- Advanced tools / go-live cleanup (Settings, owner only) -----------------
+ADVANCED_TOOLS_TITLE = "أدوات متقدمة"
+ADVANCED_CLEANUP_BUTTON = "تصفية بيانات التجربة"
+ADVANCED_CLEANUP_WARNING = (
+    "هذا الإجراء يحذف كل بيانات التجربة بشكل نهائي: الطلبات وأصنافها وجلسات "
+    "البلاي ستيشن والمصروفات والمستلزمات وسجل الإغلاقات اليومية وسجل "
+    "النسخ الاحتياطية، ويعيد ترقيم الفواتير من البداية.\n"
+    "لن يتأثر: المستخدمون، الإعدادات، المنيو، أجهزة البلاي ستيشن وأسعارها، "
+    "الترابيزات، وتصنيفات المصروفات والمصروفات الثابتة.\n"
+    "يتم أخذ نسخة احتياطية تلقائية قبل الحذف — إذا فشلت النسخة الاحتياطية "
+    "يتم إيقاف العملية بالكامل ولا يُحذف أي شيء."
+)
+ADVANCED_CLEANUP_PIN_LABEL = "الرقم السري لصاحب الكافيه"
+ADVANCED_CLEANUP_CONFIRM_WORD_LABEL = "اكتب كلمة \"تصفية\" للتأكيد"
+ADVANCED_CLEANUP_CONFIRM_BUTTON = "تأكيد التصفية"
+ADVANCED_CLEANUP_SUCCESS_MESSAGE = "تمت التصفية بنجاح. تم أخذ نسخة احتياطية قبل الحذف في: {path}"
+ADVANCED_CLEANUP_ERROR_WORD = "كلمة التأكيد غير صحيحة"
+ADVANCED_CLEANUP_ERROR_BACKUP_FAILED = "فشل أخذ نسخة احتياطية، تم إيقاف العملية ولم يُحذف أي شيء:\n{error}"
 
 # --- Users management (Settings, owner only) ---------------------------------
 USERS_TITLE = "المستخدمون"

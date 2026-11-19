@@ -156,6 +156,19 @@ def verified_pre_migration_backup(conn: sqlite3.Connection, db_path: Path, dest_
     return dest_path
 
 
+def verified_pre_cleanup_backup(conn: sqlite3.Connection, db_path: Path, dest_dir: Path, now) -> Path:
+    """Same safety net as verified_pre_migration_backup, for the owner-only
+    go-live "تصفية بيانات التجربة" cleanup (Settings -> أدوات متقدمة):
+    raises BackupError if the backup cannot be taken or does not verify --
+    the caller must NOT delete anything in that case."""
+    snapshot = take_snapshot(conn)
+    file_name = "derby-pre-cleanup-{0}.db".format(now.strftime("%Y%m%d-%H%M%S"))
+    dest_path = Path(dest_dir) / file_name
+    backup_to_file(db_path, dest_path)
+    verify_backup(dest_path, snapshot)
+    return dest_path
+
+
 def rotate_backups(folder: Path, pattern: "re.Pattern", keep_count: int) -> List[Path]:
     """Deletes the oldest files matching `pattern` beyond `keep_count`.
     Only ever touches files matching the exact pattern -- nothing else in
