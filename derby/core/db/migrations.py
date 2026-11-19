@@ -432,6 +432,31 @@ def _migration_0006_closing(conn: sqlite3.Connection) -> None:
         conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING", (key, value))
 
 
+def _migration_0007_supplies(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS supplies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            quantity_note TEXT,
+            priority TEXT NOT NULL CHECK (priority IN ('عادي', 'مستعجل')),
+            status TEXT NOT NULL CHECK (status IN ('needed', 'bought', 'dropped')),
+            note TEXT,
+            added_by INTEGER NOT NULL,
+            added_at_utc TEXT NOT NULL,
+            bought_by INTEGER,
+            bought_at_utc TEXT,
+            cost_piasters INTEGER,
+            expense_id INTEGER,
+            FOREIGN KEY (added_by) REFERENCES users (id),
+            FOREIGN KEY (bought_by) REFERENCES users (id),
+            FOREIGN KEY (expense_id) REFERENCES expenses (id)
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_supplies_status_priority ON supplies (status, priority)")
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
@@ -439,6 +464,7 @@ MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0004_playstation,
     _migration_0005_expenses,
     _migration_0006_closing,
+    _migration_0007_supplies,
 ]
 
 

@@ -79,3 +79,14 @@ def export_data(role: str) -> bool:
 
 def can_access_settings(role: str) -> bool:
     return role == ROLE_OWNER
+
+
+def view_supplies(role: str) -> bool:
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def manage_supplies_costs(role: str) -> bool:
+    """Entering a real cost and converting a bought item into an expense
+    is a money decision -- owner only. Adding/editing/marking an item
+    bought is open to a cashier (view_supplies)."""
+    return role == ROLE_OWNER

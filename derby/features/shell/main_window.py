@@ -24,6 +24,7 @@ from derby.features.shell.header import Header
 from derby.features.shell.idle_filter import IdleTimer
 from derby.features.shell.placeholder_screen import PlaceholderScreen
 from derby.features.shell.sidebar import SECTIONS, Sidebar
+from derby.features.supplies.supplies_screen import SuppliesScreen
 from derby.features.tables.tables_screen import TablesScreen
 
 
@@ -105,6 +106,8 @@ class MainWindow(QMainWindow):
                 widget = PlaystationScreen(self._conn, self._user)
             elif key == "expenses":
                 widget = ExpensesScreen(self._conn, self._user)
+            elif key == "supplies":
+                widget = SuppliesScreen(self._conn, self._user)
             elif key == "reports":
                 widget = ReportsScreen(self._conn, self._user)
             else:

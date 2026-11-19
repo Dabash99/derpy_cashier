@@ -9,6 +9,7 @@ from derby.core.db.migrations import (
     _migration_0003_cashier,
     _migration_0004_playstation,
     _migration_0005_expenses,
+    _migration_0006_closing,
     run_pending_migrations,
 )
 
@@ -164,4 +165,35 @@ def test_migration_6_preserves_phase_5_data(tmp_path):
         for row in conn.execute("SELECT key, value FROM settings WHERE key IN ('closing_enabled', 'backup_keep_count')")
     }
     assert settings == {"closing_enabled": "1", "backup_keep_count": "30"}
+    conn.close()
+
+
+def test_migration_7_preserves_phase_6_data(tmp_path):
+    """A cafe already running Phase 7 (closing/backup) must keep its data
+    when it upgrades to the supplies list."""
+    db_path = tmp_path / "upgrade67.db"
+    conn = connect(db_path)
+    conn.execute("BEGIN")
+    _migration_0001_initial(conn)
+    _migration_0002_menu(conn)
+    _migration_0003_cashier(conn)
+    _migration_0004_playstation(conn)
+    _migration_0005_expenses(conn)
+    _migration_0006_closing(conn)
+    conn.execute("PRAGMA user_version = 6")
+    conn.commit()
+
+    owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
+    table = tables_repo.list_tables(conn)[0]
+    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+
+    run_pending_migrations(conn)  # applies migration 7 on top
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+    order = orders_repo.get_order(conn, order_id)
+    assert order is not None
+    assert order["table_id"] == table["id"]
+
+    tables_in_db = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    assert "supplies" in tables_in_db
     conn.close()

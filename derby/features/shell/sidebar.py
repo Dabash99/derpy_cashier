@@ -17,6 +17,11 @@ SECTIONS = [
     ("sales_log", ar.SIDEBAR_SALES_LOG, "sales_log", None, permissions.view_sales_today),
     ("playstation", ar.SIDEBAR_PLAYSTATION, "playstation", None, permissions.use_ps),
     ("expenses", ar.SIDEBAR_EXPENSES, "expenses", None, permissions.can_access_expenses),
+    # No dedicated icon asset exists yet for supplies -- reusing "expenses"
+    # (closest existing shape) rather than leaving the sidebar button
+    # iconless; swap this for a real icon once one is rendered via
+    # tools/render_assets.py.
+    ("supplies", ar.SIDEBAR_SUPPLIES, "expenses", None, permissions.view_supplies),
     ("reports", ar.SIDEBAR_REPORTS, "reports", None, permissions.can_access_reports),
     ("settings", ar.SIDEBAR_SETTINGS, "settings", None, permissions.can_access_settings),
 ]
