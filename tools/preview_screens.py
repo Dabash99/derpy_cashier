@@ -61,9 +61,12 @@ from derby.features.pos.payment_dialog import PaymentDialog  # noqa: E402
 from derby.features.pos.pos_screen import PosScreen  # noqa: E402
 from derby.features.pos.sales_log_screen import SalesLogScreen  # noqa: E402
 from derby.features.reports.reports_screen import ReportsScreen  # noqa: E402
+from derby.features.settings.go_live_cleanup_dialog import GoLiveCleanupDialog  # noqa: E402
 from derby.features.settings.settings_screen import SettingsScreen  # noqa: E402
 from derby.features.shell.idle_filter import IdleTimer  # noqa: E402
 from derby.features.shell.main_window import MainWindow  # noqa: E402
+from derby.features.supplies.supplies_screen import SuppliesScreen  # noqa: E402
+from derby.features.tables.move_order_dialog import MoveOrderDialog  # noqa: E402
 from derby.features.tables.tables_screen import TablesScreen  # noqa: E402
 
 FAILURES = []
@@ -109,6 +112,12 @@ def _seed(conn) -> dict:
     expense_category = expense_categories_repo.list_categories(conn)[0]
     expenses_repo.create_expense(conn, expense_category["id"], 15000, today, "فاتورة كهرباء", owner_id)
 
+    from derby.features.supplies import supplies_service
+
+    supplies_service.add_supply(conn, "سكر", "كيلوجرامين", supplies_service.PRIORITY_URGENT, None, owner_id)
+    bought = supplies_service.add_supply(conn, "فناجين قهوة", "٢٤ قطعة", supplies_service.PRIORITY_NORMAL, None, owner_id)
+    supplies_service.mark_bought(conn, bought["id"], owner_id)
+
     return {
         "owner_id": owner_id,
         "cashier_id": cashier_id,
@@ -149,14 +158,15 @@ def _try(label: str, build_fn) -> None:
 
 
 def _try_shell_chrome(label_prefix: str, conn, user, db_path) -> None:
-    """MainWindow's own widget.grab()/render() silently drops the header
-    and inactive sidebar buttons' content under the offscreen platform --
-    confirmed by grabbing each sub-widget directly, which renders
-    correctly every time; this looks like an offscreen-compositor
-    limitation with a QMainWindow that owns a QStackedWidget holding many
-    large sibling screens, not an application bug (every screen's own
-    content, including the active sidebar item, renders fine). Preview
-    the header and sidebar directly instead of the whole window."""
+    """Grabs the full MainWindow (header + sidebar + active screen). An
+    earlier version of this function worked around header/sidebar text
+    going missing in a full-window grab by saving those two sub-widgets
+    separately instead, and assumed it was an offscreen-compositor
+    limitation -- it was not: Header/Sidebar are plain QWidget containers
+    styled only via QSS, and Qt never paints a plain QWidget's
+    background-color unless Qt.WA_StyledBackground is set (see
+    derby/core/theme/styled.py). Fixed at the source, so the whole
+    window can be grabbed directly now."""
     ATTEMPTED.append(label_prefix)
     try:
         app = QApplication.instance()
@@ -165,13 +175,7 @@ def _try_shell_chrome(label_prefix: str, conn, user, db_path) -> None:
         mw.show()
         for _ in range(30):
             app.processEvents()
-        OUT_DIR.mkdir(parents=True, exist_ok=True)
-        for part_name, part_widget in (("header", mw._header), ("sidebar", mw._sidebar)):
-            pixmap = part_widget.grab()
-            path = OUT_DIR / "{0}_{1}.png".format(label_prefix, part_name)
-            pixmap.save(str(path), "PNG")
-            print("wrote {0} ({1}x{2})".format(path.relative_to(PROJECT_ROOT), pixmap.width(), pixmap.height()))
-        mw.close()
+        _save(mw, label_prefix, size=(1100, 720))
     except Exception:
         FAILURES.append(label_prefix)
         print("FAILED: {0}".format(label_prefix))
@@ -208,10 +212,13 @@ def main() -> int:
     _try("reports_screen", lambda: ReportsScreen(conn, owner))
     _try("sales_log_screen", lambda: SalesLogScreen(conn, owner))
     _try("settings_screen", lambda: SettingsScreen(conn, owner, db_path))
+    _try("supplies_screen", lambda: SuppliesScreen(conn, owner))
     _try("invoice_dialog", lambda: InvoiceDialog(conn, ids["paid_order_id"], is_copy=False))
     _try("payment_dialog", lambda: PaymentDialog(conn, orders_repo.get_order(conn, ids["paid_order_id"]), owner))
     _try("discount_dialog", lambda: DiscountDialog(conn, ids["busy_order_id"], owner))
     _try("addon_dialog", lambda: AddonDialog(conn, ids["coffee_id"], "قهوة تركي"))
+    _try("move_order_dialog", lambda: MoveOrderDialog(conn, ids["busy_order_id"], owner))
+    _try("go_live_cleanup_dialog", lambda: GoLiveCleanupDialog(conn, owner, db_path))
 
     conn.close()
     empty_conn.close()
