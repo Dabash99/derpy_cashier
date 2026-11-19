@@ -528,6 +528,9 @@ CLOSING_BANNER_COPY_BUTTON = "نسخ النص"
 CLOSING_BANNER_VIEW_BUTTON = "عرض"
 CLOSING_BANNER_SENT_BUTTON = "تم الإرسال"
 
+CLOSING_BACKUP_STATUS_LINE_OK = "النسخة الاحتياطية: تمت ✅"
+CLOSING_BACKUP_STATUS_LINE_PRIMARY_FAILED = "النسخة الاحتياطية: فشل المجلد الأساسي ⚠️"
+CLOSING_BACKUP_STATUS_LINE_SECONDARY_FAILED = "النسخة الاحتياطية: فشل المجلد الثاني ⚠️"
 CLOSING_OLD_BACKUP_WARNING = "آخر نسخة احتياطية أقدم من يومين — تحقق من مجلدات النسخ الاحتياطي"
 CLOSING_EXIT_BACKUP_IN_PROGRESS = "جاري حفظ نسخة احتياطية..."
 
