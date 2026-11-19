@@ -15,6 +15,7 @@ import derby
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DERBY_DIR = PROJECT_ROOT / "derby"
+TOOLS_DIR = PROJECT_ROOT / "tools"
 PATHS_FILE = DERBY_DIR / "core" / "utils" / "paths.py"
 ALLOWED_NETWORKING_FILE = DERBY_DIR / "core" / "updates" / "update_check.py"
 WHATSAPP_FILE = DERBY_DIR / "core" / "integrations" / "whatsapp.py"
@@ -171,6 +172,29 @@ def test_no_match_statements():
         if MATCH_STATEMENT_PATTERN.search(text):
             offenders.append(str(file_path.relative_to(PROJECT_ROOT)))
     assert offenders == []
+
+
+def _all_tools_py_files():
+    if not TOOLS_DIR.exists():
+        return []
+    return sorted(TOOLS_DIR.rglob("*.py"))
+
+
+@pytest.mark.parametrize("file_path", _all_tools_py_files(), ids=lambda p: str(p.relative_to(PROJECT_ROOT)))
+def test_tools_scripts_still_forbid_real_networking(file_path: Path):
+    """tools/ is dev-time only and may import QtSvg (CLAUDE.md hard
+    constraint 4's one carve-out) -- but it must never make an actual
+    network call, same as the rest of the project."""
+    text = file_path.read_text(encoding="utf-8")
+    imported_modules = IMPORT_PATTERN.findall(text)
+    non_svg_forbidden = [item for item in FORBIDDEN_IMPORT_SUBSTRINGS if item != "QtSvg"]
+    for module_name in imported_modules:
+        for forbidden in non_svg_forbidden:
+            assert forbidden not in module_name, (
+                "{0} imports forbidden module reference {1!r} (matched {2!r})".format(
+                    file_path.relative_to(PROJECT_ROOT), module_name, forbidden
+                )
+            )
 
 
 def test_no_real_user_path_computed_outside_paths_py():

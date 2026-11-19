@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
-from derby.core.theme.fonts import FONT_FAMILY, load_bundled_fonts
+from derby.core.theme.fonts import CAIRO_FAMILY, load_bundled_fonts
 from derby.core.utils.money import piasters_to_egp_float, piasters_to_plain_text
 from derby.features.reports.report_service import ReportResult
 
@@ -240,7 +240,7 @@ def build_report_html(sections: Sequence[ExportSection], cafe_name: str, period_
         "<p>{generated}</p>"
         "{tables}"
         "</body></html>"
-    ).format(font=FONT_FAMILY, cafe=cafe_name, period=period_text, generated=generated_text, tables=tables_html)
+    ).format(font=CAIRO_FAMILY, cafe=cafe_name, period=period_text, generated=generated_text, tables=tables_html)
 
 
 def render_html_to_pdf(html: str, path: Path) -> None:
@@ -256,7 +256,7 @@ def render_html_to_pdf(html: str, path: Path) -> None:
     writer.setResolution(150)
 
     document = QTextDocument()
-    document.setDefaultFont(QFont(FONT_FAMILY, 10))
+    document.setDefaultFont(QFont(CAIRO_FAMILY, 10))
     document.setHtml(html)
 
     page_width = writer.width()
