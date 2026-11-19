@@ -100,6 +100,7 @@ class BackupClosingPanel(QWidget):
         self._backup_now_button.clicked.connect(self._on_backup_now)
         actions_row.addWidget(self._backup_now_button)
         self._close_today_button = QPushButton(ar.CLOSING_CLOSE_TODAY_BUTTON)
+        self._close_today_button.setProperty("variant", "primary")
         self._close_today_button.clicked.connect(self._on_close_today)
         actions_row.addWidget(self._close_today_button)
         self._retry_secondary_button = QPushButton(ar.CLOSING_RETRY_SECONDARY_BUTTON)

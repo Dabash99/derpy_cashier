@@ -10,9 +10,12 @@ working unchanged: role="title"/"subtitle"/"error" on QLabel, danger="true"
 and flat="true" on QPushButton, active="true"/"false" on sidebar buttons,
 and the #Sidebar/#Header object names. `variant="..."` is the newer,
 broader hook (primary/secondary/ghost/card/chip/badge/table) screens can
-opt into per docs/BRAND.md's visual language; a QPushButton with no
-variant set still renders as primary (amber fill, black text), since
-that's the dominant action style in a cashier-first app.
+opt into per docs/BRAND.md's visual language. A QPushButton with no
+variant set renders as a neutral white/bordered button, NOT amber --
+amber is reserved for variant="primary" on the handful of genuine
+primary call-to-action buttons (pay, login, confirm payment), matching
+docs/BRAND.md's 15%-amber usage ratio; tagging every button amber would
+blow well past that and make nothing stand out.
 """
 from __future__ import annotations
 
@@ -40,31 +43,43 @@ def build_stylesheet() -> str:
     /* ---- Buttons --------------------------------------------------- */
 
     QPushButton {{
-        background-color: {primary_fill};
-        color: {primary_text};
-        border: none;
+        background-color: {surface};
+        color: {text_primary};
+        border: 1px solid {surface_border};
         border-radius: {radius_md}px;
         padding: {space_2}px {space_4}px;
         min-height: {control_height_default}px;
         font-weight: 600;
     }}
 
-    QPushButton[variant="primary"] {{
-        min-height: {control_height_primary}px;
-        font-size: {font_size_subtitle}px;
-    }}
-
     QPushButton:hover {{
-        background-color: {primary_fill_hover};
+        background-color: {background};
     }}
 
     QPushButton:pressed {{
-        background-color: {primary_fill_pressed};
+        background-color: {surface_border};
     }}
 
     QPushButton:disabled {{
         background-color: {disabled_fill};
         color: {disabled_text};
+        border: none;
+    }}
+
+    QPushButton[variant="primary"] {{
+        background-color: {primary_fill};
+        color: {primary_text};
+        border: none;
+        min-height: {control_height_primary}px;
+        font-size: {font_size_subtitle}px;
+    }}
+
+    QPushButton[variant="primary"]:hover {{
+        background-color: {primary_fill_hover};
+    }}
+
+    QPushButton[variant="primary"]:pressed {{
+        background-color: {primary_fill_pressed};
     }}
 
     QPushButton[variant="secondary"] {{

@@ -23,6 +23,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import orders_repo, ps_devices_repo, ps_sessions_repo
 from derby.core.i18n import ar
+from derby.core.theme.fonts import latin_numeric_font
 from derby.core.utils.money import format_egp
 from derby.features.auth import permissions
 from derby.features.playstation import ps_service
@@ -39,6 +40,7 @@ class _DeviceCard(QFrame):
     def __init__(self, conn: sqlite3.Connection, device_id: int, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
+        self.setProperty("variant", "card")
         self._conn = conn
         self._device_id = device_id
         self._user = user
@@ -54,8 +56,10 @@ class _DeviceCard(QFrame):
         self._state_label = QLabel("")
         layout.addWidget(self._state_label)
         self._elapsed_label = QLabel("")
+        self._elapsed_label.setFont(latin_numeric_font(18))
         layout.addWidget(self._elapsed_label)
         self._price_label = QLabel("")
+        self._price_label.setFont(latin_numeric_font(14))
         layout.addWidget(self._price_label)
         self._flags_label = QLabel("")
         self._flags_label.setProperty("role", "error")

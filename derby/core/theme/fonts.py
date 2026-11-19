@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Tuple
 
-from PySide2.QtGui import QFontDatabase
+from PySide2.QtGui import QFont, QFontDatabase
 
 from derby.core.utils.resource_path import resource_path
 
@@ -58,6 +58,26 @@ def missing_montserrat_files() -> Tuple[str, ...]:
     run (with Cairo covering Latin text) if they were never placed."""
     fonts_dir = _assets_fonts_dir()
     return tuple(name for name in _MONTSERRAT_FILES if not (fonts_dir / name).exists())
+
+
+def latin_numeric_font(point_size: int = -1, bold: bool = True) -> QFont:
+    """For big numeric displays (totals, prices, timers) and Latin
+    headings: Montserrat first, with Cairo as the fallback family for
+    any Arabic glyphs mixed into the same label (e.g. "الإجمالي: 50.00")
+    so they still shape correctly even though Montserrat itself carries
+    no Arabic glyphs. Works whether or not Montserrat's files are
+    actually present -- see the module docstring.
+
+    `point_size` defaults to -1 (leave size untouched), so this can be
+    combined with a QSS role like role="title" that already sets the
+    size -- only the font family/weight changes here.
+    """
+    font = QFont()
+    font.setFamilies(list(LATIN_FONT_FALLBACK_CHAIN))
+    if point_size > 0:
+        font.setPointSize(point_size)
+    font.setBold(bold)
+    return font
 
 
 def load_bundled_fonts() -> None:

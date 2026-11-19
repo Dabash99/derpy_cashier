@@ -30,6 +30,18 @@ def test_load_bundled_fonts_does_not_raise_when_montserrat_is_absent(qapp):
     assert fonts.montserrat_available() is False
 
 
+def test_latin_numeric_font_uses_fallback_chain_and_leaves_size_alone_by_default(qapp):
+    font = fonts.latin_numeric_font()
+    assert list(font.families()) == list(fonts.LATIN_FONT_FALLBACK_CHAIN)
+    assert font.bold() is True
+
+
+def test_latin_numeric_font_applies_explicit_point_size_when_given(qapp):
+    font = fonts.latin_numeric_font(18, bold=False)
+    assert font.pointSize() == 18
+    assert font.bold() is False
+
+
 def test_montserrat_available_becomes_true_once_files_are_present(qapp, tmp_path, monkeypatch):
     # Reuse a real, already-bundled TTF (valid font data, just not
     # actually Montserrat) to exercise the registration code path without

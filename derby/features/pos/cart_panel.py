@@ -22,6 +22,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import orders_repo, ps_sessions_repo, users_repo
 from derby.core.i18n import ar
+from derby.core.theme.fonts import latin_numeric_font
 from derby.core.utils.money import format_egp
 from derby.features.playstation import ps_service
 from derby.features.pos import orders_service
@@ -79,6 +80,7 @@ class CartPanel(QWidget):
         layout.addWidget(self._discount_label)
         self._total_label = QLabel("")
         self._total_label.setProperty("role", "title")
+        self._total_label.setFont(latin_numeric_font())
         layout.addWidget(self._total_label)
 
         self._pay_hint_label = QLabel("")
@@ -92,6 +94,7 @@ class CartPanel(QWidget):
         buttons_row.addWidget(discount_button)
 
         self._pay_button = QPushButton(ar.POS_PAY_BUTTON)
+        self._pay_button.setProperty("variant", "primary")
         self._pay_button.clicked.connect(self.pay_requested.emit)
         buttons_row.addWidget(self._pay_button)
 

@@ -73,6 +73,7 @@ class SetupScreen(QWidget):
         layout.addWidget(self._error_label)
 
         submit_button = QPushButton(ar.SETUP_SUBMIT_BUTTON)
+        submit_button.setProperty("variant", "primary")
         submit_button.clicked.connect(self._on_submit)
         layout.addWidget(submit_button)
 

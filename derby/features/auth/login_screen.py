@@ -82,6 +82,7 @@ class LoginScreen(QWidget):
         layout.addLayout(keypad_layout)
 
         self._login_button = QPushButton(ar.LOGIN_BUTTON)
+        self._login_button.setProperty("variant", "primary")
         self._login_button.setMinimumHeight(48)
         self._login_button.clicked.connect(self._on_login_clicked)
         layout.addWidget(self._login_button)

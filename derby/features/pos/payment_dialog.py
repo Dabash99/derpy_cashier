@@ -45,10 +45,12 @@ class PaymentDialog(QDialog):
 
         buttons_row = QHBoxLayout()
         cash_button = QPushButton(ar.PAYMENT_CASH_BUTTON)
+        cash_button.setProperty("variant", "primary")
         cash_button.clicked.connect(lambda: self._on_pay("cash"))
         buttons_row.addWidget(cash_button)
 
         instapay_button = QPushButton(ar.PAYMENT_INSTAPAY_BUTTON)
+        instapay_button.setProperty("variant", "primary")
         instapay_button.clicked.connect(lambda: self._on_pay("instapay"))
         buttons_row.addWidget(instapay_button)
         layout.addLayout(buttons_row)
