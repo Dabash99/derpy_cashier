@@ -16,6 +16,63 @@ from derby.features.pos.invoice_dialog import InvoiceDialog
 from derby.features.pos.payment_dialog import PaymentDialog
 
 
+def test_grid_tab_scrolls_instead_of_squeezing_cards(qapp, db_conn):
+    from PySide2.QtWidgets import QScrollArea
+
+    owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
+    screen = PlaystationScreen(db_conn, users_repo.get_user(db_conn, owner_id))
+    assert screen.findChild(QScrollArea) is not None
+
+
+def test_device_card_buttons_visible_per_state(qapp, db_conn):
+    owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
+    owner = users_repo.get_user(db_conn, owner_id)
+    device = ps_devices_repo.list_devices(db_conn)[0]
+    ps_devices_repo.set_rates(db_conn, device["id"], 4000, 6000)
+
+    screen = PlaystationScreen(db_conn, owner)
+    card = screen._cards[device["id"]]
+
+    # Free: only the two "start" buttons. The card is never shown on
+    # screen in this test, so isVisible() would be False regardless --
+    # isHidden() reflects the explicit setVisible() flag instead.
+    assert not card._start_single_button.isHidden()
+    assert not card._start_multi_button.isHidden()
+    assert card._stop_button.isHidden()
+    assert card._close_empty_button.isHidden()
+
+    # Running: switch/stop/adjust, no start/close.
+    card._on_start("single")
+    assert card._start_single_button.isHidden()
+    assert not card._switch_button.isHidden()
+    assert not card._stop_button.isHidden()
+    assert not card._adjust_start_button.isHidden()
+    assert not card._mode_badge_label.isHidden()
+    assert card._mode_badge_label.text() == "Single"
+
+    # Stopped with a billed line: start again, open/move the invoice.
+    card._on_stop()
+    assert not card._start_single_button.isHidden()
+    assert not card._open_invoice_button.isHidden()
+    assert not card._move_button.isHidden()
+    assert card._close_empty_button.isHidden()
+
+    # The only line gets removed (owner, no approval needed) -> leftover
+    # empty invoice -> one-click close only.
+    from derby.features.pos import orders_service
+
+    order = orders_repo.get_open_order_for_device(db_conn, device["id"])
+    item = orders_repo.list_order_items(db_conn, order["id"])[0]
+    orders_service.remove_ps_item(db_conn, order["id"], item["id"], owner)
+    card.refresh()
+    assert not card._close_empty_button.isHidden()
+    assert card._open_invoice_button.isHidden()
+    assert card._move_button.isHidden()
+
+    card._on_close_empty_invoice()
+    assert orders_repo.get_order(db_conn, order["id"])["status"] == "cancelled"
+
+
 def test_two_device_cards_shown(qapp, db_conn):
     owner_id = users_repo.create_user(db_conn, "Owner", users_repo.ROLE_OWNER, "1111")
     screen = PlaystationScreen(db_conn, users_repo.get_user(db_conn, owner_id))

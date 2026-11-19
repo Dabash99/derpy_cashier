@@ -9,13 +9,15 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide2.QtCore import QTimer, Signal
+from PySide2.QtCore import Qt, QTimer, Signal
 from PySide2.QtWidgets import (
     QDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QScrollArea,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -23,6 +25,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import orders_repo, ps_devices_repo, ps_sessions_repo
 from derby.core.i18n import ar
+from derby.core.theme import tokens
 from derby.core.theme.fonts import latin_numeric_font
 from derby.core.utils.money import format_egp
 from derby.features.auth import permissions
@@ -33,6 +36,9 @@ from derby.features.pos import orders_service
 from derby.features.pos.exceptions import DeviceRateNotSetError, SessionRunningError
 from derby.features.tables.move_order_dialog import MoveOrderDialog
 
+_GRID_COLUMNS = 3
+_CARD_MIN_WIDTH = 300
+
 
 class _DeviceCard(QFrame):
     order_opened = Signal(int)
@@ -42,6 +48,7 @@ class _DeviceCard(QFrame):
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
         self.setProperty("variant", "card")
+        self.setMinimumWidth(_CARD_MIN_WIDTH)
         self._conn = conn
         self._device_id = device_id
         self._user = user
@@ -50,20 +57,37 @@ class _DeviceCard(QFrame):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setSpacing(tokens.SPACE_2)
 
+        header_row = QHBoxLayout()
         self._name_label = QLabel("")
         self._name_label.setProperty("role", "title")
-        layout.addWidget(self._name_label)
+        header_row.addWidget(self._name_label)
+        header_row.addStretch(1)
         self._state_label = QLabel("")
-        layout.addWidget(self._state_label)
+        self._state_label.setProperty("variant", "badge")
+        header_row.addWidget(self._state_label)
+        layout.addLayout(header_row)
+
         self._elapsed_label = QLabel("")
-        self._elapsed_label.setFont(latin_numeric_font(18))
+        self._elapsed_label.setAlignment(Qt.AlignCenter)
+        self._elapsed_label.setFont(latin_numeric_font(tokens.FONT_SIZE_DISPLAY, bold=True))
+        self._elapsed_label.setMinimumHeight(tokens.FONT_SIZE_DISPLAY + tokens.SPACE_3)
         layout.addWidget(self._elapsed_label)
+
+        badges_row = QHBoxLayout()
+        self._mode_badge_label = QLabel("")
+        self._mode_badge_label.setProperty("variant", "badge")
+        badges_row.addWidget(self._mode_badge_label)
+        badges_row.addStretch(1)
+        layout.addLayout(badges_row)
+
         self._price_label = QLabel("")
         self._price_label.setFont(latin_numeric_font(14))
         layout.addWidget(self._price_label)
         self._flags_label = QLabel("")
         self._flags_label.setProperty("role", "error")
+        self._flags_label.setWordWrap(True)
         layout.addWidget(self._flags_label)
 
         row1 = QHBoxLayout()
@@ -77,15 +101,17 @@ class _DeviceCard(QFrame):
         self._switch_button.clicked.connect(self._on_switch)
         row1.addWidget(self._switch_button)
         self._stop_button = QPushButton(ar.PS_STOP_BUTTON)
+        self._stop_button.setProperty("danger", "true")
         self._stop_button.clicked.connect(self._on_stop)
         row1.addWidget(self._stop_button)
-        self._adjust_start_button = QPushButton(ar.PS_ADJUST_START_TITLE)
-        self._adjust_start_button.clicked.connect(self._on_adjust_start)
-        row1.addWidget(self._adjust_start_button)
         layout.addLayout(row1)
 
         row2 = QHBoxLayout()
+        self._adjust_start_button = QPushButton(ar.PS_ADJUST_START_TITLE)
+        self._adjust_start_button.clicked.connect(self._on_adjust_start)
+        row2.addWidget(self._adjust_start_button)
         self._open_invoice_button = QPushButton(ar.PS_OPEN_INVOICE_BUTTON)
+        self._open_invoice_button.setProperty("variant", "primary")
         self._open_invoice_button.clicked.connect(self._on_open_invoice)
         row2.addWidget(self._open_invoice_button)
         self._move_button = QPushButton(ar.TABLES_MOVE_ORDER_BUTTON)
@@ -124,12 +150,12 @@ class _DeviceCard(QFrame):
         if running is not None:
             mode_label = ar.PS_MODE_SINGLE_LABEL if running["mode"] == ps_service.MODE_SINGLE else ar.PS_MODE_MULTI_LABEL
             self._state_label.setText(ar.PS_STATE_RUNNING.format(mode=mode_label))
+            self._mode_badge_label.setText(mode_label)
+            self._mode_badge_label.setVisible(True)
             total_seconds = state["elapsed_seconds"]
             hours, remainder = divmod(total_seconds, 3600)
             minutes, seconds = divmod(remainder, 60)
-            self._elapsed_label.setText(
-                ar.PS_ELAPSED_LABEL.format(time="{0:02d}:{1:02d}:{2:02d}".format(hours, minutes, seconds))
-            )
+            self._elapsed_label.setText("{0:02d}:{1:02d}:{2:02d}".format(hours, minutes, seconds))
             self._price_label.setText(
                 ar.PS_PROVISIONAL_PRICE_LABEL.format(price=format_egp(state["provisional_price_piasters"]))
             )
@@ -139,6 +165,7 @@ class _DeviceCard(QFrame):
             self._set_buttons_visible(start=False, switch=True, stop=True, open_invoice=True, move=False, close_empty=False)
         elif order is not None and orders_repo.list_order_items(self._conn, order["id"]):
             self._state_label.setText(ar.PS_STATE_STOPPED_WITH_ORDER)
+            self._mode_badge_label.setVisible(False)
             self._elapsed_label.setText("")
             self._price_label.setText("")
             self._set_buttons_visible(start=True, switch=False, stop=False, open_invoice=True, move=True, close_empty=False)
@@ -146,11 +173,13 @@ class _DeviceCard(QFrame):
             # A leftover order with no items left (e.g. its only ps_time
             # line was removed) -- one-click close, no approval needed.
             self._state_label.setText(ar.PS_STATE_EMPTY_ORDER)
+            self._mode_badge_label.setVisible(False)
             self._elapsed_label.setText("")
             self._price_label.setText("")
             self._set_buttons_visible(start=True, switch=False, stop=False, open_invoice=False, move=False, close_empty=True)
         else:
             self._state_label.setText(ar.PS_STATE_FREE)
+            self._mode_badge_label.setVisible(False)
             self._elapsed_label.setText("")
             self._price_label.setText("")
             self._set_buttons_visible(start=True, switch=False, stop=False, open_invoice=False, move=False, close_empty=False)
@@ -254,8 +283,21 @@ class PlaystationScreen(QWidget):
         layout.addWidget(tabs)
 
     def _build_grid_tab(self) -> QWidget:
+        # A plain QHBoxLayout squeezed every card into one ever-narrower
+        # row with no way to scroll -- a grid that wraps, inside a scroll
+        # area, is what keeps every card and button usable at 1024x680
+        # regardless of how many devices the cafe has.
         tab = QWidget()
-        self._cards_layout = QHBoxLayout(tab)
+        outer = QVBoxLayout(tab)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        self._cards_host = QWidget()
+        self._cards_layout = QGridLayout(self._cards_host)
+        self._cards_layout.setSpacing(tokens.SPACE_4)
+        scroll_area.setWidget(self._cards_host)
+        outer.addWidget(scroll_area)
         return tab
 
     def reload(self) -> None:
@@ -264,13 +306,13 @@ class PlaystationScreen(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         self._cards = {}
-        for device in ps_devices_repo.list_devices(self._conn, active_only=True):
+        for index, device in enumerate(ps_devices_repo.list_devices(self._conn, active_only=True)):
             card = _DeviceCard(self._conn, device["id"], self._user, parent=self)
             card.order_opened.connect(self.order_opened.emit)
             card.state_changed.connect(self._update_timer_state)
             self._cards[device["id"]] = card
-            self._cards_layout.addWidget(card)
-        self._cards_layout.addStretch(1)
+            row, col = divmod(index, _GRID_COLUMNS)
+            self._cards_layout.addWidget(card, row, col)
         self._update_timer_state()
 
     def _tick(self) -> None:
