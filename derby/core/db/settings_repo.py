@@ -26,6 +26,12 @@ DEFAULTS: Dict[str, str] = {
     # so a restart of the app does not reset an in-progress lockout.
     "login_failed_attempts": "0",
     "login_locked_until_utc": "",
+    # Daily closing / backup (Phase 7).
+    "closing_enabled": "1",
+    "backup_keep_count": "30",
+    "whatsapp_method": "desktop",
+    "last_exit_backup_utc": "",
+    "app_first_run_date": "",
 }
 
 

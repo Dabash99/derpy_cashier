@@ -376,12 +376,69 @@ def _migration_0005_expenses(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migration_0006_closing(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS day_closures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_date TEXT NOT NULL UNIQUE,
+            revision INTEGER NOT NULL DEFAULT 1,
+            built_at_utc TEXT NOT NULL,
+            trigger TEXT NOT NULL CHECK (trigger IN ('auto', 'catchup', 'manual', 'exit')),
+            report_text TEXT NOT NULL,
+            invoice_count INTEGER NOT NULL DEFAULT 0,
+            net_sales_piasters INTEGER NOT NULL DEFAULT 0,
+            expenses_piasters INTEGER NOT NULL DEFAULT 0,
+            profit_piasters INTEGER NOT NULL DEFAULT 0,
+            open_orders_count INTEGER NOT NULL DEFAULT 0,
+            running_sessions_count INTEGER NOT NULL DEFAULT 0,
+            backup_file_name TEXT,
+            backup_primary_status TEXT,
+            backup_secondary_status TEXT CHECK (backup_secondary_status IN ('ok', 'failed', 'skipped', 'pending') OR backup_secondary_status IS NULL),
+            backup_message TEXT,
+            sent_at_utc TEXT,
+            sent_by INTEGER,
+            stale INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (sent_by) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS backup_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            at_utc TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('daily', 'manual', 'exit')),
+            target TEXT NOT NULL CHECK (target IN ('primary', 'secondary')),
+            path TEXT,
+            size_bytes INTEGER,
+            sha256 TEXT,
+            verified INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL,
+            error TEXT
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_day_closures_business_date ON day_closures (business_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_backup_log_target_verified ON backup_log (target, verified, at_utc)")
+
+    for key, value in (
+        ("closing_enabled", "1"),
+        ("backup_keep_count", "30"),
+        ("whatsapp_method", "desktop"),
+        ("last_exit_backup_utc", ""),
+        ("app_first_run_date", ""),
+    ):
+        conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING", (key, value))
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
     _migration_0003_cashier,
     _migration_0004_playstation,
     _migration_0005_expenses,
+    _migration_0006_closing,
 ]
 
 

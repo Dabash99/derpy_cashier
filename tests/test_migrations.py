@@ -8,6 +8,7 @@ from derby.core.db.migrations import (
     _migration_0002_menu,
     _migration_0003_cashier,
     _migration_0004_playstation,
+    _migration_0005_expenses,
     run_pending_migrations,
 )
 
@@ -128,4 +129,39 @@ def test_migration_5_preserves_phase_4_data(tmp_path):
     assert {"expense_categories", "recurring_expenses", "expenses"}.issubset(tables_in_db)
     categories = conn.execute("SELECT name FROM expense_categories ORDER BY sort_order").fetchall()
     assert [row["name"] for row in categories] == ["إيجار", "كهرباء", "مياه", "صيانة", "أدوات شغل", "أخرى"]
+    conn.close()
+
+
+def test_migration_6_preserves_phase_5_data(tmp_path):
+    """A cafe already running Phase 6 (expenses/reports) must keep its data
+    when it upgrades to Phase 7 (closing/backup/WhatsApp)."""
+    db_path = tmp_path / "upgrade56.db"
+    conn = connect(db_path)
+    conn.execute("BEGIN")
+    _migration_0001_initial(conn)
+    _migration_0002_menu(conn)
+    _migration_0003_cashier(conn)
+    _migration_0004_playstation(conn)
+    _migration_0005_expenses(conn)
+    conn.execute("PRAGMA user_version = 5")
+    conn.commit()
+
+    owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
+    table = tables_repo.list_tables(conn)[0]
+    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+
+    run_pending_migrations(conn)  # applies migration 6 on top
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+    order = orders_repo.get_order(conn, order_id)
+    assert order is not None
+    assert order["table_id"] == table["id"]
+
+    tables_in_db = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    assert {"day_closures", "backup_log"}.issubset(tables_in_db)
+    settings = {
+        row["key"]: row["value"]
+        for row in conn.execute("SELECT key, value FROM settings WHERE key IN ('closing_enabled', 'backup_keep_count')")
+    }
+    assert settings == {"closing_enabled": "1", "backup_keep_count": "30"}
     conn.close()
