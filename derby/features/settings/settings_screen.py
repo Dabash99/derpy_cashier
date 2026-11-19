@@ -10,6 +10,7 @@ from PySide2.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
 
 from derby.core.i18n import ar
 from derby.features.closing.backup_closing_panel import BackupClosingPanel
+from derby.features.settings.about_panel import AboutPanel
 from derby.features.settings.general_settings_form import GeneralSettingsForm
 from derby.features.settings.update_check_panel import UpdateCheckPanel
 from derby.features.settings.users_management import UsersManagementWidget
@@ -35,4 +36,5 @@ class SettingsScreen(QWidget):
         tabs.addTab(self._users_widget, ar.SETTINGS_TAB_USERS)
         tabs.addTab(self._update_panel, ar.SETTINGS_TAB_UPDATES)
         tabs.addTab(self._backup_closing_panel, ar.CLOSING_SETTINGS_TAB)
+        tabs.addTab(AboutPanel(), ar.SETTINGS_TAB_ABOUT)
         layout.addWidget(tabs)

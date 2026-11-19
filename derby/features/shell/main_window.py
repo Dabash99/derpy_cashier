@@ -80,7 +80,7 @@ class MainWindow(QMainWindow):
         self._idle_timer.start()
 
     def _build_screens(self) -> None:
-        for key, _label, phase, allowed in SECTIONS:
+        for key, _label, _icon_name, phase, allowed in SECTIONS:
             if not allowed(self._user["role"]):
                 continue
             if key == "settings":
@@ -131,7 +131,7 @@ class MainWindow(QMainWindow):
             self._sidebar.set_active(key)
 
     def _navigate_to_default(self) -> None:
-        for key, _label, _phase, _allowed in SECTIONS:
+        for key, _label, _icon_name, _phase, _allowed in SECTIONS:
             if key in self._screens:
                 self._on_navigate(key)
                 return

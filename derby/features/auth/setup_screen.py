@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide2.QtCore import QRegExp, Signal
+from PySide2.QtCore import QRegExp, Qt, Signal
 from PySide2.QtGui import QRegExpValidator
 from PySide2.QtWidgets import (
     QLabel,
@@ -19,6 +19,7 @@ from PySide2.QtWidgets import (
 from derby.core.db import users_repo
 from derby.core.db.settings_repo import set_value
 from derby.core.i18n import ar
+from derby.core.theme import icons
 from derby.core.utils.pin_hash import is_valid_pin_format
 
 
@@ -34,6 +35,11 @@ class SetupScreen(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(60, 60, 60, 60)
         layout.setSpacing(14)
+
+        logo_label = QLabel()
+        logo_label.setPixmap(icons.logo_pixmap("transparent", 140))
+        logo_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(logo_label)
 
         title = QLabel(ar.SETUP_TITLE)
         title.setProperty("role", "title")

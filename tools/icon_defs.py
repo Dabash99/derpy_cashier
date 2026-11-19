@@ -111,6 +111,12 @@ ICONS = {
     "send": [
         '<path d="M3 11l18-8-8 18-2-7-8-3z" {0}/>'.format(_COMMON),
     ],
+    "sales_log": [
+        '<rect x="5" y="3" width="14" height="18" rx="1.5" {0}/>'.format(_COMMON),
+        '<line x1="8" y1="8" x2="16" y2="8" {0}/>'.format(_COMMON),
+        '<line x1="8" y1="12" x2="16" y2="12" {0}/>'.format(_COMMON),
+        '<line x1="8" y1="16" x2="13" y2="16" {0}/>'.format(_COMMON),
+    ],
     "user": [
         '<circle cx="12" cy="8" r="4" {0}/>'.format(_COMMON),
         '<path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" {0}/>'.format(_COMMON),

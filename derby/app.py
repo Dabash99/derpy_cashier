@@ -12,13 +12,14 @@ import sys
 from pathlib import Path
 
 from PySide2.QtCore import QEventLoop, Qt, QTimer
-from PySide2.QtGui import QFont
+from PySide2.QtGui import QFont, QIcon
 from PySide2.QtWidgets import QApplication, QDialog, QLabel, QMessageBox, QStackedWidget, QVBoxLayout
 
 from derby.core.db import audit_repo, settings_repo, users_repo
 from derby.core.db.connection import connect
 from derby.core.db.migrations import run_pending_migrations
 from derby.core.i18n import ar
+from derby.core.theme import icons
 from derby.core.theme.fonts import CAIRO_FAMILY, load_bundled_fonts
 from derby.core.theme.stylesheet import build_stylesheet
 from derby.core.utils.paths import app_data_dir, database_path
@@ -178,6 +179,9 @@ def main() -> int:
     load_bundled_fonts()
     app.setFont(QFont(CAIRO_FAMILY, 10))
     app.setStyleSheet(build_stylesheet())
+    icon_pixmap = icons.icon_mark_pixmap("mono-black", 256)
+    if not icon_pixmap.isNull():
+        app.setWindowIcon(QIcon(icon_pixmap))
 
     guard = SingleInstanceGuard()
     if not guard.try_acquire():

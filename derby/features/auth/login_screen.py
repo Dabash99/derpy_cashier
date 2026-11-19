@@ -8,7 +8,7 @@ from __future__ import annotations
 import sqlite3
 
 from PySide2.QtCore import QRegExp, Qt, QTimer, Signal
-from PySide2.QtGui import QRegExpValidator
+from PySide2.QtGui import QPainter, QRegExpValidator
 from PySide2.QtWidgets import (
     QGridLayout,
     QLabel,
@@ -20,6 +20,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import audit_repo, users_repo
 from derby.core.i18n import ar
+from derby.core.theme import icons
 from derby.features.auth import lockout
 
 MAX_PIN_LENGTH = 6
@@ -31,6 +32,7 @@ class LoginScreen(QWidget):
     def __init__(self, conn: sqlite3.Connection, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
+        self._texture = icons.login_texture_pixmap()
         self._build_ui()
         self._lock_timer = QTimer(self)
         self._lock_timer.setInterval(1000)
@@ -42,6 +44,11 @@ class LoginScreen(QWidget):
         layout.setContentsMargins(60, 40, 60, 40)
         layout.setSpacing(16)
         layout.setAlignment(Qt.AlignCenter)
+
+        logo_label = QLabel()
+        logo_label.setPixmap(icons.logo_pixmap("transparent", 180))
+        logo_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(logo_label)
 
         title = QLabel(ar.LOGIN_TITLE)
         title.setProperty("role", "title")
@@ -140,3 +147,13 @@ class LoginScreen(QWidget):
         self._pin_display.clear()
         self._pin_display.setFocus()
         self._refresh_lock_state()
+
+    def paintEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        # A single low-contrast coffee-bean tile, repeated -- see
+        # docs/BRAND.md. Painted under everything else; never competes
+        # with the login form.
+        if not self._texture.isNull():
+            painter = QPainter(self)
+            painter.drawTiledPixmap(self.rect(), self._texture)
+            painter.end()
+        super().paintEvent(event)

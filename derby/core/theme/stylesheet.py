@@ -194,10 +194,23 @@ def build_stylesheet() -> str:
 
     #Header QLabel, QWidget[variant="header"] QLabel {{
         color: {text_on_dark};
+        background-color: transparent;
     }}
 
     #Header QLabel[role="subtitle"], QWidget[variant="header"] QLabel[role="subtitle"] {{
         color: {text_on_dark_muted};
+    }}
+
+    #Header QPushButton, QWidget[variant="header"] QPushButton {{
+        background-color: transparent;
+        color: {text_on_dark};
+        border: 1px solid {text_on_dark_muted};
+        min-height: {control_height_default}px;
+        font-weight: 500;
+    }}
+
+    #Header QPushButton:hover, QWidget[variant="header"] QPushButton:hover {{
+        background-color: {sidebar_active};
     }}
 
     /* ---- Tables -------------------------------------------------- */

@@ -15,8 +15,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
+from derby.core.theme import tokens
 from derby.core.theme.fonts import CAIRO_FAMILY, load_bundled_fonts
 from derby.core.utils.money import piasters_to_egp_float, piasters_to_plain_text
+from derby.core.utils.resource_path import resource_path
 from derby.features.reports.report_service import ReportResult
 
 _SHEET_NAME_FORBIDDEN = re.compile(r'[\\/*?:\[\]]')
@@ -186,6 +188,10 @@ def _safe_sheet_name(title: str, used_names) -> str:
 
 def write_xlsx_sections(sections: Sequence[ExportSection], path: Path) -> None:
     import openpyxl  # lazy import -- keeps app startup free of this cost
+    from openpyxl.styles import Font, PatternFill
+
+    header_fill = PatternFill(start_color=tokens.AMBER_500.lstrip("#"), end_color=tokens.AMBER_500.lstrip("#"), fill_type="solid")
+    header_font = Font(color=tokens.JET_BLACK.lstrip("#"), bold=True)
 
     workbook = openpyxl.Workbook()
     workbook.remove(workbook.active)
@@ -195,6 +201,9 @@ def write_xlsx_sections(sections: Sequence[ExportSection], path: Path) -> None:
         sheet = workbook.create_sheet(title=_safe_sheet_name(section.title, used_names))
         sheet.sheet_view.rightToLeft = True
         sheet.append(section.headers)
+        for cell in sheet[1]:
+            cell.fill = header_fill
+            cell.font = header_font
         for row in section.rows:
             rendered = [
                 piasters_to_egp_float(value) if index in section.money_columns else value
@@ -216,31 +225,60 @@ def write_xlsx_sections(sections: Sequence[ExportSection], path: Path) -> None:
 
 
 def _html_table(section: ExportSection) -> str:
-    header_cells = "".join("<th>{0}</th>".format(h) for h in section.headers)
+    header_cells = "".join(
+        "<th style='background-color:{bg}; color:{fg}; border:1px solid {border};'>{text}</th>".format(
+            bg=tokens.AMBER_100, fg=tokens.TEXT_ON_AMBER, border=tokens.SURFACE_BORDER, text=h
+        )
+        for h in section.headers
+    )
     body_rows = []
     for row in section.rows:
         cells = []
         for index, value in enumerate(row):
             text = piasters_to_plain_text(value) if index in section.money_columns else str(value)
-            cells.append("<td>{0}</td>".format(text))
+            cells.append("<td style='border:1px solid {0};'>{1}</td>".format(tokens.SURFACE_BORDER, text))
         body_rows.append("<tr>{0}</tr>".format("".join(cells)))
     return (
-        "<h3>{title}</h3>"
-        "<table border='1' cellspacing='0' cellpadding='4' width='100%'>"
+        "<h3 style='color:{title_color};'>{title}</h3>"
+        "<table border='0' cellspacing='0' cellpadding='4' width='100%'>"
         "<tr>{header}</tr>{body}</table><br/>"
-    ).format(title=section.title, header=header_cells, body="".join(body_rows))
+    ).format(title_color=tokens.TEXT_PRIMARY, title=section.title, header=header_cells, body="".join(body_rows))
+
+
+def _logo_header_html() -> str:
+    # Printer-friendly: white background, black mark (not amber -- amber
+    # ink is expensive/inconsistent on a typical office printer), a thin
+    # amber accent rule underneath instead of a filled band.
+    logo_path = resource_path("assets", "brand", "icon-mark-mono-black-128.png")
+    if not logo_path.exists():
+        return ""
+    return (
+        "<table border='0' cellspacing='0' cellpadding='0' width='100%'>"
+        "<tr><td width='64'><img src='{src}' height='48'/></td>"
+        "<td style='font-size:16pt; font-weight:bold;'>DERBY</td></tr></table>"
+        "<hr style='border:none; border-top:3px solid {amber}; margin:4px 0 10px 0;'/>"
+    ).format(src=logo_path.resolve().as_uri(), amber=tokens.AMBER_500)
 
 
 def build_report_html(sections: Sequence[ExportSection], cafe_name: str, period_text: str, generated_text: str) -> str:
     tables_html = "".join(_html_table(section) for section in sections)
     return (
-        "<html><body dir='rtl' style='font-family: {font}; font-size: 11pt;'>"
+        "<html><body dir='rtl' style='font-family: {font}; font-size: 11pt; color:{text};'>"
+        "{logo_header}"
         "<h1>{cafe}</h1>"
         "<p>{period}</p>"
         "<p>{generated}</p>"
         "{tables}"
         "</body></html>"
-    ).format(font=CAIRO_FAMILY, cafe=cafe_name, period=period_text, generated=generated_text, tables=tables_html)
+    ).format(
+        font=CAIRO_FAMILY,
+        text=tokens.TEXT_PRIMARY,
+        logo_header=_logo_header_html(),
+        cafe=cafe_name,
+        period=period_text,
+        generated=generated_text,
+        tables=tables_html,
+    )
 
 
 def render_html_to_pdf(html: str, path: Path) -> None:

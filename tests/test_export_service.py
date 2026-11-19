@@ -66,6 +66,20 @@ def test_xlsx_export_reopens_with_correct_numbers_and_rtl(tmp_path, sample_repor
     assert count_sheet.cell(row=2, column=1).value == 1
 
 
+def test_xlsx_header_row_is_styled_with_brand_amber(tmp_path, sample_report):
+    import openpyxl
+
+    from derby.core.theme import tokens
+
+    path = tmp_path / "report.xlsx"
+    export_service.export_report_xlsx(sample_report, path)
+    workbook = openpyxl.load_workbook(str(path))
+    sheet = workbook["الملخص المالي"]
+    header_cell = sheet.cell(row=1, column=1)
+    assert header_cell.fill.start_color.rgb[-6:].upper() == tokens.AMBER_500.lstrip("#").upper()
+    assert header_cell.font.bold is True
+
+
 def test_pdf_export_is_non_empty_and_valid_header(qapp, tmp_path, sample_report):
     path = tmp_path / "report.pdf"
     export_service.export_report_pdf(sample_report, "ديربي", datetime(2026, 1, 10, 12, 0), path)
@@ -73,6 +87,12 @@ def test_pdf_export_is_non_empty_and_valid_header(qapp, tmp_path, sample_report)
     raw_bytes = path.read_bytes()
     assert len(raw_bytes) > 1000
     assert raw_bytes.startswith(b"%PDF")
+
+
+def test_pdf_html_header_includes_the_logo_mark():
+    html = export_service.build_report_html([], "ديربي", "الفترة", "تم الإنشاء")
+    assert "icon-mark-mono-black-128.png" in html
+    assert "DERBY" in html
 
 
 def test_export_of_an_empty_period_works(qapp, tmp_path, db_conn):

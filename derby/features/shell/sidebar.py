@@ -1,22 +1,23 @@
 """The right-hand navigation list. Hides sections the current role can't use."""
 from __future__ import annotations
 
-from PySide2.QtCore import Signal
+from PySide2.QtCore import QSize, Signal
 from PySide2.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
 from derby.core.i18n import ar
+from derby.core.theme import icons
 from derby.features.auth import permissions
 
-# (key, label, phase-if-not-built-yet, permission check)
+# (key, label, icon name in assets/brand/icons, phase-if-not-built-yet, permission check)
 SECTIONS = [
-    ("menu", ar.SIDEBAR_MENU, None, permissions.can_manage_menu),
-    ("pos", ar.SIDEBAR_CASHIER, None, permissions.use_pos),
-    ("tables", ar.SIDEBAR_TABLES, None, permissions.view_tables),
-    ("sales_log", ar.SIDEBAR_SALES_LOG, None, permissions.view_sales_today),
-    ("playstation", ar.SIDEBAR_PLAYSTATION, None, permissions.use_ps),
-    ("expenses", ar.SIDEBAR_EXPENSES, None, permissions.can_access_expenses),
-    ("reports", ar.SIDEBAR_REPORTS, None, permissions.can_access_reports),
-    ("settings", ar.SIDEBAR_SETTINGS, None, permissions.can_access_settings),
+    ("menu", ar.SIDEBAR_MENU, "menu", None, permissions.can_manage_menu),
+    ("pos", ar.SIDEBAR_CASHIER, "cashier", None, permissions.use_pos),
+    ("tables", ar.SIDEBAR_TABLES, "tables", None, permissions.view_tables),
+    ("sales_log", ar.SIDEBAR_SALES_LOG, "sales_log", None, permissions.view_sales_today),
+    ("playstation", ar.SIDEBAR_PLAYSTATION, "playstation", None, permissions.use_ps),
+    ("expenses", ar.SIDEBAR_EXPENSES, "expenses", None, permissions.can_access_expenses),
+    ("reports", ar.SIDEBAR_REPORTS, "reports", None, permissions.can_access_reports),
+    ("settings", ar.SIDEBAR_SETTINGS, "settings", None, permissions.can_access_settings),
 ]
 
 
@@ -31,10 +32,14 @@ class Sidebar(QWidget):
         layout.setContentsMargins(8, 16, 8, 16)
         layout.setSpacing(4)
 
-        for key, label, _phase, allowed in SECTIONS:
+        for key, label, icon_name, _phase, allowed in SECTIONS:
             if not allowed(role):
                 continue
             button = QPushButton(label)
+            # "light" (cream stroke) icon variant, to sit on the black
+            # sidebar background -- see docs/BRAND.md.
+            button.setIcon(icons.icon(icon_name, variant="light"))
+            button.setIconSize(QSize(20, 20))
             button.clicked.connect(lambda _checked=False, k=key: self.navigate.emit(k))
             layout.addWidget(button)
             self._buttons[key] = button

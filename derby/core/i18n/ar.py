@@ -557,3 +557,14 @@ GENERIC_CANCEL = "إلغاء"
 GENERIC_SAVE = "حفظ"
 GENERIC_ERROR_TITLE = "خطأ"
 GENERIC_SUCCESS_TITLE = "تم بنجاح"
+
+# --- About (brand/UI refresh, Part A3) ---------------------------------------
+SETTINGS_TAB_ABOUT = "عن البرنامج"
+ABOUT_APP_NAME = "ديربي"
+ABOUT_VERSION_LABEL = "الإصدار"
+ABOUT_DATA_FOLDER_LABEL = "مجلد البيانات"
+ABOUT_LICENSES_TITLE = "الخطوط والأيقونات"
+ABOUT_LICENSES_TEXT = (
+    "خط Cairo وخط Montserrat مرخّصان بموجب SIL Open Font License؛ "
+    "الشعار والأيقونات من تصميم ديربي."
+)

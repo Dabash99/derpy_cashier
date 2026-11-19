@@ -18,6 +18,8 @@ from typing import Tuple
 
 from PySide2.QtGui import QFontDatabase
 
+from derby.core.utils.resource_path import resource_path
+
 _CAIRO_FILES = ("Cairo-Regular.ttf", "Cairo-SemiBold.ttf", "Cairo-Bold.ttf")
 # Static (non-variable) weights only -- see module docstring.
 _MONTSERRAT_FILES = (
@@ -40,8 +42,7 @@ _montserrat_available = False
 
 
 def _assets_fonts_dir() -> Path:
-    # derby/core/theme/fonts.py -> project root is three parents up.
-    return Path(__file__).resolve().parents[3] / "assets" / "fonts"
+    return resource_path("assets", "fonts")
 
 
 def montserrat_available() -> bool:

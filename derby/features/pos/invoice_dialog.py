@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import sqlite3
 
+from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout
 
 from derby.core.db import orders_repo, ps_devices_repo, settings_repo, tables_repo, users_repo
 from derby.core.i18n import ar
+from derby.core.theme import icons
 from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo
 
@@ -28,6 +30,11 @@ class InvoiceDialog(QDialog):
     def _build_ui(self) -> None:
         order = orders_repo.get_order(self._conn, self._order_id)
         layout = QVBoxLayout(self)
+
+        logo_label = QLabel()
+        logo_label.setPixmap(icons.logo_pixmap("transparent", 110))
+        logo_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(logo_label)
 
         cafe_name = settings_repo.get(self._conn, "cafe_name", "") or ""
         title = QLabel(cafe_name)
