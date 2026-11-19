@@ -220,8 +220,10 @@ def render_login_texture() -> None:
     bean_side = int(bbox.height() * 0.62)
     bean_rect = QRect(bbox.center().x() - bean_side // 2, bbox.top() + int(bbox.height() * 0.12), bean_side, bean_side)
     bean_rect = bean_rect.intersected(full_color.rect())
-    mono_cream_on_cream_source = flatten_to_color(full_color, QColor(CREAM.red() - 10, CREAM.green() - 14, CREAM.blue() - 18, 40))
-    tile = mono_cream_on_cream_source.copy(bean_rect).scaled(96, 96, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    mono_cream_on_cream_source = flatten_to_color(full_color, QColor(CREAM.red() - 10, CREAM.green() - 14, CREAM.blue() - 18, 18))
+    # A bigger tile (fewer repeats across the login screen's width) reads
+    # as a faint motif rather than a busy, obviously-repeating wallpaper.
+    tile = mono_cream_on_cream_source.copy(bean_rect).scaled(220, 220, Qt.KeepAspectRatio, Qt.SmoothTransformation)
     save(tile, "login-texture-bean-tile.png")
 
 

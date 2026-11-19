@@ -22,6 +22,8 @@ class OwnerPinPrompt(QDialog):
         layout.addWidget(self._pin_input)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText(ar.GENERIC_OK)
+        buttons.button(QDialogButtonBox.Cancel).setText(ar.GENERIC_CANCEL)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)

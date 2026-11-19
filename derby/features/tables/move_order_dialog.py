@@ -52,6 +52,8 @@ class MoveOrderDialog(QDialog):
         layout.addWidget(self._error_label)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText(ar.GENERIC_OK)
+        buttons.button(QDialogButtonBox.Cancel).setText(ar.GENERIC_CANCEL)
         buttons.accepted.connect(self._on_confirm)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)

@@ -122,6 +122,8 @@ class ProductDialog(QDialog):
         layout.addWidget(self._error_label)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Save).setText(ar.GENERIC_SAVE)
+        buttons.button(QDialogButtonBox.Cancel).setText(ar.GENERIC_CANCEL)
         buttons.accepted.connect(self._on_save)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)

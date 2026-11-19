@@ -65,6 +65,7 @@ class AddonDialog(QDialog):
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.button(QDialogButtonBox.Ok).setText(ar.ADDON_DIALOG_CONFIRM_BUTTON)
+        buttons.button(QDialogButtonBox.Cancel).setText(ar.GENERIC_CANCEL)
         buttons.accepted.connect(self._on_confirm)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
