@@ -117,6 +117,7 @@ class ExpensesScreen(QWidget):
         layout.addLayout(actions_row)
 
         self._totals_label = QLabel("")
+        self._totals_label.setWordWrap(True)
         layout.addWidget(self._totals_label)
 
         self._export_panel = ExportPanel(lambda: "مصروفات_{0}".format(self._month_input.text().strip()))

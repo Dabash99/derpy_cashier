@@ -71,6 +71,7 @@ class ReportsScreen(QWidget):
         layout.addWidget(self._warning_label)
 
         self._summary_label = QLabel("")
+        self._summary_label.setWordWrap(True)
         layout.addWidget(self._summary_label)
 
         self._payment_table = self._build_table([ar.REPORTS_COLUMN_METHOD, ar.REPORTS_COLUMN_COUNT, ar.REPORTS_COLUMN_TOTAL])

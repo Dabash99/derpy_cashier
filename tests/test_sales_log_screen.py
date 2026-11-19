@@ -59,7 +59,7 @@ def test_void_updates_status_and_excludes_from_totals(qapp, db_conn):
     paid = _paid_order(db_conn, owner_id)
 
     screen = SalesLogScreen(db_conn, owner)
-    screen._table.selectRow(0)
+    screen._table.setCurrentCell(0, 0)
 
     from derby.features.pos import orders_service as service
 

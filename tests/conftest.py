@@ -14,6 +14,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest  # noqa: E402
+from PySide2.QtCore import Qt  # noqa: E402
 from PySide2.QtWidgets import QApplication  # noqa: E402
 
 from derby.core.db import settings_repo  # noqa: E402
@@ -75,8 +76,25 @@ def db_conn(tmp_path):
 
 @pytest.fixture(scope="session")
 def qapp():
-    """One QApplication for the whole test session (Qt forbids more than one)."""
+    """One QApplication for the whole test session (Qt forbids more than one).
+
+    Matches derby/app.py's main(): RTL layout direction and the real
+    stylesheet, set once here, not per-test or left to an incidental
+    side effect of whichever test file happens to run first. A test
+    built under Qt's LTR/unstyled defaults would never exercise the
+    real app's mirrored layouts or #Sidebar/#Header backgrounds, which
+    is exactly how the sidebar-on-the-wrong-side and invisible-text
+    bugs went uncaught."""
+    from PySide2.QtGui import QFont
+
+    from derby.core.theme.fonts import CAIRO_FAMILY, load_bundled_fonts
+    from derby.core.theme.stylesheet import build_stylesheet
+
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
+    app.setLayoutDirection(Qt.RightToLeft)
+    load_bundled_fonts()
+    app.setFont(QFont(CAIRO_FAMILY, 10))
+    app.setStyleSheet(build_stylesheet())
     return app

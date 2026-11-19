@@ -115,6 +115,7 @@ class SalesLogScreen(QWidget):
         layout.addLayout(actions_row)
 
         self._totals_label = QLabel("")
+        self._totals_label.setWordWrap(True)
         layout.addWidget(self._totals_label)
 
     def _selected_date(self) -> str:

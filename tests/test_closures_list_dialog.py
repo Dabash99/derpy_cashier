@@ -21,7 +21,7 @@ def test_mark_sent_updates_status(qapp, db_conn, tmp_path):
     day_closures_repo.create_closure(db_conn, "2026-01-10", "auto", "نص", 3, 5000, 0, 5000, 0, 0)
 
     dialog = ClosuresListDialog(db_conn, users_repo.get_user(db_conn, owner_id), tmp_path / "test_derby.db")
-    dialog._table.selectRow(0)
+    dialog._table.setCurrentCell(0, 0)
     dialog._on_mark_sent()
     assert "تم الإرسال" in dialog._table.item(0, 4).text()
 
@@ -37,7 +37,7 @@ def test_rebuild_increments_revision(qapp, db_conn, tmp_path):
     settings_repo.set_value(db_conn, "backup_folder_primary", str(tmp_path / "primary"))
 
     dialog = ClosuresListDialog(db_conn, users_repo.get_user(db_conn, owner_id), tmp_path / "test_derby.db")
-    dialog._table.selectRow(0)
+    dialog._table.setCurrentCell(0, 0)
     dialog._on_rebuild()
 
     reloaded = day_closures_repo.get_closure(db_conn, closure_id)
