@@ -29,6 +29,7 @@ ALLOWED_STARTFILE_OR_BROWSER_FILES = {
     WHATSAPP_FILE,
     DERBY_DIR / "features" / "settings" / "update_check_panel.py",
     DERBY_DIR / "features" / "reports" / "export_panel.py",
+    DERBY_DIR / "features" / "settings" / "about_panel.py",
 }
 
 FORBIDDEN_DEPENDENCIES = [

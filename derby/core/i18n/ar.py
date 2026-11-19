@@ -32,6 +32,12 @@ LOGIN_ERROR_NO_ACTIVE_USERS = "لا يوجد مستخدمون نشطون. توا
 ALREADY_RUNNING_TITLE = "البرنامج يعمل بالفعل"
 ALREADY_RUNNING_MESSAGE = "البرنامج مفتوح بالفعل على هذا الجهاز. لا يمكن فتح نسخة ثانية في نفس الوقت"
 
+# --- Unexpected-error handling (Phase 8) -------------------------------------
+UNEXPECTED_ERROR_TITLE = "حصل خطأ غير متوقع"
+UNEXPECTED_ERROR_MESSAGE = "حصل خطأ غير متوقع، بياناتك متحفوظة.\n\nملف السجل: {log_path}"
+UNEXPECTED_ERROR_COPY_BUTTON = "نسخ التفاصيل"
+SETTINGS_OPEN_LOGS_FOLDER_BUTTON = "فتح فولدر السجلات"
+
 # --- Sidebar / shell --------------------------------------------------------
 SIDEBAR_MENU = "المنيو"
 SIDEBAR_CASHIER = "الكاشير"

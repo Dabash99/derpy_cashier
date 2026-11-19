@@ -1,15 +1,21 @@
 """The "عن البرنامج" (About) settings tab: logo, app name, version, data
-folder path, and font/icon license notes -- Part A3 of the brand/UI
-refresh. No business logic; pure read-only display.
+folder path, font/icon license notes, and a button to open the local
+error-log folder (Phase 8/B1) -- opening a local folder on this machine
+via os.startfile is not a network call, same category as
+export_panel.py's "open containing export folder" button; see
+tests/test_policy.py's ALLOWED_STARTFILE_OR_BROWSER_FILES.
 """
 from __future__ import annotations
 
+import os
+
 from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide2.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 import derby
 from derby.core.i18n import ar
 from derby.core.theme import icons
+from derby.core.utils import error_log
 from derby.core.utils.paths import app_data_dir
 
 
@@ -49,4 +55,14 @@ class AboutPanel(QWidget):
         licenses_text.setWordWrap(True)
         layout.addWidget(licenses_text)
 
+        open_logs_button = QPushButton(ar.SETTINGS_OPEN_LOGS_FOLDER_BUTTON)
+        open_logs_button.clicked.connect(self._on_open_logs_folder)
+        layout.addWidget(open_logs_button)
+
         layout.addStretch(1)
+
+    def _on_open_logs_folder(self) -> None:
+        folder = error_log.log_dir()
+        folder.mkdir(parents=True, exist_ok=True)
+        if hasattr(os, "startfile"):
+            os.startfile(str(folder))  # noqa: S606 -- opens Explorer on a local folder, Windows-only

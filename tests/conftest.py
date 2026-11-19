@@ -53,6 +53,17 @@ def _never_touch_real_documents_folder(tmp_path, monkeypatch):
         monkeypatch.setattr(target, lambda: fake_documents_derby / "Exports")
 
 
+@pytest.fixture(autouse=True)
+def _never_touch_real_appdata_folder(tmp_path, monkeypatch):
+    """Safety net, on every single test: paths.app_data_dir() reads
+    DERBY_DATA_DIR (falling back to %APPDATA%) fresh on every call -- see
+    its docstring -- so setting this one env var redirects every call
+    site at once, no per-module patching needed (unlike
+    default_backup_dir/default_export_dir above, which predate this
+    override and still need it for modules that bound their own name)."""
+    monkeypatch.setenv("DERBY_DATA_DIR", str(tmp_path / "fake_appdata_derby"))
+
+
 @pytest.fixture()
 def db_conn(tmp_path):
     conn = connect(tmp_path / "test_derby.db")
