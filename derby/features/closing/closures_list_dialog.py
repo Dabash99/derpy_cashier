@@ -13,12 +13,12 @@ from PySide2.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
 )
 
 from derby.core.db import day_closures_repo, settings_repo
 from derby.core.i18n import ar
+from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.money import format_egp
 from derby.core.utils.paths import default_backup_dir
 from derby.features.closing import closing_service
@@ -48,6 +48,7 @@ class ClosuresListDialog(QDialog):
         )
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
+        configure_table(self._table, stretch_columns=(3, 4), fixed_widths={0: 100, 1: 70, 2: 110})
         layout.addWidget(self._table)
 
         actions_row = QHBoxLayout()
@@ -87,8 +88,9 @@ class ClosuresListDialog(QDialog):
             backup_text,
             sent_text,
         ]
-        for column, value in enumerate(values):
-            self._table.setItem(row_index, column, QTableWidgetItem(value))
+        makers = [centered_item, centered_item, centered_item, right_item, right_item]
+        for column, (value, make_item) in enumerate(zip(values, makers)):
+            self._table.setItem(row_index, column, make_item(value))
 
     def _selected_closure(self):
         row = self._table.currentRow()

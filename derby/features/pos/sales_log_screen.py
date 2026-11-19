@@ -17,13 +17,13 @@ from PySide2.QtWidgets import (
     QMessageBox,
     QPushButton,
     QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from derby.core.db import orders_repo, ps_devices_repo, settings_repo, tables_repo, users_repo
 from derby.core.i18n import ar
+from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo, utc_now
@@ -99,6 +99,11 @@ class SalesLogScreen(QWidget):
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
         self._table.cellDoubleClicked.connect(self._on_row_double_clicked)
+        configure_table(
+            self._table,
+            stretch_columns=(2, 5),  # table/device name, cashier name
+            fixed_widths={0: 70, 1: 70, 3: 110, 4: 90, 6: 90},
+        )
         layout.addWidget(self._table)
 
         actions_row = QHBoxLayout()
@@ -151,6 +156,7 @@ class SalesLogScreen(QWidget):
         method_text = _METHOD_LABELS.get(order["payment_method"], order["payment_method"] or "")
         status_text = _STATUS_LABELS.get(order["status"], order["status"])
 
+        makers = [centered_item, centered_item, right_item, centered_item, centered_item, right_item, centered_item]
         values = [
             str(order["invoice_no"] or ""),
             cairo_time,
@@ -160,8 +166,8 @@ class SalesLogScreen(QWidget):
             cashier_name,
             status_text,
         ]
-        for column, value in enumerate(values):
-            self._table.setItem(row, column, QTableWidgetItem(value))
+        for column, (value, make_item) in enumerate(zip(values, makers)):
+            self._table.setItem(row, column, make_item(value))
 
     def _update_totals(self, selected_date: str) -> None:
         all_paid = orders_repo.list_orders(self._conn, business_date=selected_date, status="paid")

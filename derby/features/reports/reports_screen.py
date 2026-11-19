@@ -16,7 +16,6 @@ from PySide2.QtWidgets import (
     QLabel,
     QLineEdit,
     QTableWidget,
-    QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -24,6 +23,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import settings_repo
 from derby.core.i18n import ar
+from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import to_cairo, utc_now
 from derby.features.reports import report_service
@@ -117,6 +117,7 @@ class ReportsScreen(QWidget):
         table = QTableWidget(0, len(headers))
         table.setHorizontalHeaderLabels(headers)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
+        configure_table(table, stretch_columns=(0,))  # column 0 is always the name/date/method label
         return table
 
     # --- date range tabs ---------------------------------------------------
@@ -235,7 +236,8 @@ class ReportsScreen(QWidget):
         table.setRowCount(len(rows))
         for row_index, row in enumerate(rows):
             for column_index, value in enumerate(row):
-                table.setItem(row_index, column_index, QTableWidgetItem(value))
+                make_item = right_item if column_index == 0 else centered_item
+                table.setItem(row_index, column_index, make_item(value))
 
     # --- export --------------------------------------------------------
 

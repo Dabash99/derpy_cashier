@@ -19,13 +19,13 @@ from PySide2.QtWidgets import (
     QProgressBar,
     QPushButton,
     QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
 )
 
 from derby.core.db import audit_repo
 from derby.core.db.connection import connect
 from derby.core.i18n import ar
+from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.money import piasters_to_plain_text
 from derby.features.menu.csv_importer import (
     EXISTS_ACTION_SKIP,
@@ -120,6 +120,11 @@ class ImportDialog(QDialog):
             ]
         )
         self._preview_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        configure_table(
+            self._preview_table,
+            stretch_columns=(2, 3, 6),  # name_ar, name_en, note
+            fixed_widths={0: 90, 1: 110, 4: 90, 5: 130},
+        )
         layout.addWidget(self._preview_table)
 
         self._exists_action_input = QComboBox()
@@ -179,8 +184,9 @@ class ImportDialog(QDialog):
                 row.image_file or "",
                 row.note,
             ]
-            for column, value in enumerate(values):
-                self._preview_table.setItem(row_index, column, QTableWidgetItem(value))
+            makers = [centered_item, right_item, right_item, right_item, centered_item, right_item, right_item]
+            for column, (value, make_item) in enumerate(zip(values, makers)):
+                self._preview_table.setItem(row_index, column, make_item(value))
 
     def _on_start_import(self) -> None:
         if not self._classified_rows:

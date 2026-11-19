@@ -256,6 +256,22 @@ def build_stylesheet() -> str:
         min-height: {control_height_row}px;
         padding: {space_1}px {space_2}px;
     }}
+
+    QListWidget {{
+        background-color: {surface};
+        border: 1px solid {surface_border};
+        border-radius: {radius_md}px;
+    }}
+
+    QListWidget::item {{
+        min-height: {control_height_row}px;
+        padding: {space_2}px {space_3}px;
+    }}
+
+    QListWidget::item:selected {{
+        background-color: {amber_100};
+        color: {text_on_amber};
+    }}
     """.format(
         font=FONT_FAMILY,
         font_size_body=tokens.FONT_SIZE_BODY,

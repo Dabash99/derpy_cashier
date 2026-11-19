@@ -11,12 +11,12 @@ from PySide2.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from derby.core.i18n import ar
+from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.money import format_egp
 from derby.features.menu import images
 
@@ -56,6 +56,11 @@ class ProductsTable(QWidget):
         self._table.setIconSize(QSize(40, 40))
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
+        configure_table(
+            self._table,
+            stretch_columns=(_COLUMN_NAME_AR, _COLUMN_NAME_EN),
+            fixed_widths={_COLUMN_IMAGE: 64, _COLUMN_PRICE: 100, _COLUMN_STATUS: 90, _COLUMN_REVIEW: 120},
+        )
         self._table.verticalScrollBar().valueChanged.connect(lambda _value: self._load_visible_thumbnails())
         self._table.cellDoubleClicked.connect(self._on_double_clicked)
         self._table.itemSelectionChanged.connect(self._refresh_actions_state)
@@ -83,14 +88,14 @@ class ProductsTable(QWidget):
         self._loaded_rows = set()
         self._table.setRowCount(len(self._products))
         for row, product in enumerate(self._products):
-            self._table.setItem(row, _COLUMN_IMAGE, QTableWidgetItem(""))
-            self._table.setItem(row, _COLUMN_NAME_AR, QTableWidgetItem(product["name_ar"]))
-            self._table.setItem(row, _COLUMN_NAME_EN, QTableWidgetItem(product["name_en"] or ""))
-            self._table.setItem(row, _COLUMN_PRICE, QTableWidgetItem(format_egp(product["price_piasters"])))
+            self._table.setItem(row, _COLUMN_IMAGE, centered_item(""))
+            self._table.setItem(row, _COLUMN_NAME_AR, right_item(product["name_ar"]))
+            self._table.setItem(row, _COLUMN_NAME_EN, right_item(product["name_en"] or ""))
+            self._table.setItem(row, _COLUMN_PRICE, centered_item(format_egp(product["price_piasters"])))
             status_text = ar.USERS_INACTIVE_LABEL if not product["is_active"] else ar.USERS_ACTIVE_LABEL
-            self._table.setItem(row, _COLUMN_STATUS, QTableWidgetItem(status_text))
+            self._table.setItem(row, _COLUMN_STATUS, centered_item(status_text))
             review_text = ar.MENU_NEEDS_REVIEW_BADGE if product["needs_price_review"] else ""
-            self._table.setItem(row, _COLUMN_REVIEW, QTableWidgetItem(review_text))
+            self._table.setItem(row, _COLUMN_REVIEW, centered_item(review_text))
         QTimer.singleShot(0, self._load_visible_thumbnails)
         self._refresh_actions_state()
 

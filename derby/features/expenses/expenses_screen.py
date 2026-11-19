@@ -17,7 +17,6 @@ from PySide2.QtWidgets import (
     QLineEdit,
     QPushButton,
     QTableWidget,
-    QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -25,6 +24,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import expense_categories_repo, expenses_repo
 from derby.core.i18n import ar
+from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.money import format_egp, piasters_to_plain_text
 from derby.features.expenses import expenses_service
 from derby.features.expenses.expense_categories_panel import ExpenseCategoriesPanel
@@ -94,6 +94,11 @@ class ExpensesScreen(QWidget):
         )
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
+        configure_table(
+            self._table,
+            stretch_columns=(1, 2),  # category, description
+            fixed_widths={0: 100, 3: 110, 4: 90, 5: 90},
+        )
         layout.addWidget(self._table)
 
         actions_row = QHBoxLayout()
@@ -163,8 +168,9 @@ class ExpensesScreen(QWidget):
             ar.EXPENSES_RECEIPT_HAS_ONE if expense["receipt_file"] else "",
             ar.EXPENSES_STATUS_VOID if expense["status"] == "void" else ar.EXPENSES_STATUS_ACTIVE,
         ]
-        for column, value in enumerate(values):
-            self._table.setItem(row_index, column, QTableWidgetItem(value))
+        makers = [centered_item, right_item, right_item, centered_item, centered_item, centered_item]
+        for column, (value, make_item) in enumerate(zip(values, makers)):
+            self._table.setItem(row_index, column, make_item(value))
 
     def _update_totals(self, start_date: str, end_date: str, category_name_by_id) -> None:
         active_rows = expenses_repo.list_expenses(self._conn, start_date=start_date, end_date=end_date, status="active")
