@@ -265,3 +265,38 @@ def is_backup_stale_for_banner(conn: sqlite3.Connection, now: datetime) -> bool:
     if last is None:
         return True
     return (now - parse_utc_iso(last["at_utc"])) > timedelta(days=STARTUP_BACKUP_WARNING_DAYS)
+
+
+def retry_secondary_backup(conn: sqlite3.Connection, db_path: Path, secondary_dir: Path, keep_count: int):
+    """"إعادة المحاولة للمجلد الثاني": copies the last verified PRIMARY
+    backup file to the secondary target (no need to re-run the SQLite
+    backup API) and updates the matching day_closures row, if any, so
+    its secondary status is no longer stale."""
+    last_primary = backup_log_repo.last_verified_backup(conn, "primary")
+    if last_primary is None:
+        return backup_service.TargetOutcome(status="failed", error=ar.BACKUP_ERROR_FOLDER_UNAVAILABLE)
+
+    source_path = Path(last_primary["path"])
+    file_name = source_path.name
+    rotation_pattern = (
+        backup_service.MANUAL_FILENAME_PATTERN
+        if backup_service.MANUAL_FILENAME_PATTERN.match(file_name)
+        else backup_service.DAILY_FILENAME_PATTERN
+    )
+    outcome = backup_service.run_backup_to_target(
+        db_path, secondary_dir, file_name, {}, rotation_pattern, keep_count, source_file_to_copy=source_path
+    )
+    backup_log_repo.log_backup(
+        conn, "daily", "secondary", outcome.status, path=outcome.path, size_bytes=outcome.size_bytes,
+        sha256=outcome.sha256, verified=outcome.verified, error=outcome.error,
+    )
+
+    business_date_text = file_name[len("derby-"):-len(".db")] if file_name.startswith("derby-") else None
+    if business_date_text:
+        closure = day_closures_repo.get_closure_by_date(conn, business_date_text)
+        if closure is not None:
+            day_closures_repo.set_backup_status(
+                conn, closure["id"], closure["backup_file_name"], closure["backup_primary_status"],
+                outcome.status, closure["backup_message"],
+            )
+    return outcome

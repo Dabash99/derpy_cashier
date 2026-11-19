@@ -247,3 +247,27 @@ def test_run_manual_backup_uses_manual_filename_pattern(db_conn, tmp_path):
     primary, _secondary = closing_service.run_manual_backup(db_conn, db_path, now, tmp_path / "primary", None)
     assert primary.status == "ok"
     assert "derby-manual-20260101-103000.db" in primary.path
+
+
+# --- retry secondary -----------------------------------------------------
+
+
+def test_retry_secondary_backup_copies_last_primary_and_updates_closure(db_conn, tmp_path):
+    db_path = tmp_path / "test_derby.db"
+    closure = closing_service.close_or_rebuild_day(
+        db_conn, db_path, date(2026, 1, 1), "auto", "ديربي", tmp_path / "primary", None, 30, date(2026, 1, 1)
+    )
+    assert closure["backup_secondary_status"] is None  # no secondary configured yet
+
+    outcome = closing_service.retry_secondary_backup(db_conn, db_path, tmp_path / "secondary", 30)
+    assert outcome.status == "ok"
+    assert (tmp_path / "secondary" / "derby-2026-01-01.db").exists()
+
+    reloaded = day_closures_repo.get_closure(db_conn, closure["id"])
+    assert reloaded["backup_secondary_status"] == "ok"
+    assert reloaded["backup_primary_status"] == "ok"  # untouched
+
+
+def test_retry_secondary_backup_fails_gracefully_with_no_primary_yet(db_conn, tmp_path):
+    outcome = closing_service.retry_secondary_backup(db_conn, tmp_path / "test_derby.db", tmp_path / "secondary", 30)
+    assert outcome.status == "failed"

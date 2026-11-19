@@ -5,17 +5,7 @@ import re
 import sqlite3
 
 from PySide2.QtCore import Signal
-from PySide2.QtWidgets import (
-    QFileDialog,
-    QFormLayout,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QSpinBox,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide2.QtWidgets import QFormLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget
 
 from derby.core.db import settings_repo
 from derby.core.i18n import ar
@@ -52,14 +42,10 @@ class GeneralSettingsForm(QWidget):
         self._rounding_step_input.setRange(1, 100)
         form.addRow(ar.SETTINGS_ROUNDING_STEP_LABEL, self._rounding_step_input)
 
-        self._whatsapp_number_input = QLineEdit()
-        form.addRow(ar.SETTINGS_WHATSAPP_NUMBER_LABEL, self._whatsapp_number_input)
-
-        self._backup_primary_input, backup_primary_row = self._build_folder_row()
-        form.addRow(ar.SETTINGS_BACKUP_PRIMARY_LABEL, backup_primary_row)
-
-        self._backup_secondary_input, backup_secondary_row = self._build_folder_row()
-        form.addRow(ar.SETTINGS_BACKUP_SECONDARY_LABEL, backup_secondary_row)
+        # whatsapp_number and the backup folders moved to the dedicated
+        # "النسخ الاحتياطي والإقفال" tab (Phase 7), which has richer
+        # validation (Egyptian-number hint, same-drive warning, folder
+        # test buttons) -- editing them in two places would be confusing.
 
         self._auto_lock_input = QSpinBox()
         self._auto_lock_input.setRange(1, 120)
@@ -77,32 +63,12 @@ class GeneralSettingsForm(QWidget):
         save_button.clicked.connect(self._on_save)
         outer.addWidget(save_button)
 
-    def _build_folder_row(self):
-        row_widget = QWidget()
-        row_layout = QHBoxLayout(row_widget)
-        row_layout.setContentsMargins(0, 0, 0, 0)
-        folder_input = QLineEdit()
-        browse_button = QPushButton("...")
-        browse_button.setFixedWidth(40)
-        browse_button.clicked.connect(lambda: self._browse_folder(folder_input))
-        row_layout.addWidget(folder_input)
-        row_layout.addWidget(browse_button)
-        return folder_input, row_widget
-
-    def _browse_folder(self, target_input: QLineEdit) -> None:
-        chosen = QFileDialog.getExistingDirectory(self, ar.SETTINGS_BACKUP_PRIMARY_LABEL, target_input.text())
-        if chosen:
-            target_input.setText(chosen)
-
     def reload(self) -> None:
         values = settings_repo.get_all(self._conn)
         self._cafe_name_input.setText(values["cafe_name"])
         self._close_time_input.setText(values["business_close_time"])
         self._ps_min_minutes_input.setValue(int(values["ps_min_minutes"]))
         self._rounding_step_input.setValue(int(values["rounding_step_egp"]))
-        self._whatsapp_number_input.setText(values["whatsapp_number"])
-        self._backup_primary_input.setText(values["backup_folder_primary"])
-        self._backup_secondary_input.setText(values["backup_folder_secondary"])
         self._auto_lock_input.setValue(int(values["auto_lock_minutes"]))
         self._update_url_input.setText(values["update_manifest_url"])
         self._error_label.setText("")
@@ -113,18 +79,10 @@ class GeneralSettingsForm(QWidget):
             self._error_label.setText(ar.SETTINGS_ERROR_INVALID_TIME)
             return
 
-        whatsapp_number = self._whatsapp_number_input.text().strip()
-        if whatsapp_number and not whatsapp_number.isdigit():
-            self._error_label.setText(ar.SETTINGS_ERROR_INVALID_WHATSAPP)
-            return
-
         settings_repo.set_value(self._conn, "cafe_name", self._cafe_name_input.text().strip())
         settings_repo.set_value(self._conn, "business_close_time", close_time_text)
         settings_repo.set_value(self._conn, "ps_min_minutes", str(self._ps_min_minutes_input.value()))
         settings_repo.set_value(self._conn, "rounding_step_egp", str(self._rounding_step_input.value()))
-        settings_repo.set_value(self._conn, "whatsapp_number", whatsapp_number)
-        settings_repo.set_value(self._conn, "backup_folder_primary", self._backup_primary_input.text().strip())
-        settings_repo.set_value(self._conn, "backup_folder_secondary", self._backup_secondary_input.text().strip())
         settings_repo.set_value(self._conn, "auto_lock_minutes", str(self._auto_lock_input.value()))
         settings_repo.set_value(self._conn, "update_manifest_url", self._update_url_input.text().strip())
 
