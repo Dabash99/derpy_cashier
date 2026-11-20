@@ -84,6 +84,7 @@ SETTINGS_AUTO_LOCK_LABEL = "القفل التلقائي بعد (دقيقة)"
 SETTINGS_UPDATE_URL_LABEL = "رابط ملف التحديثات"
 SETTINGS_ERROR_INVALID_NUMBER = "من فضلك اكتب رقمًا صحيحًا"
 SETTINGS_ERROR_INVALID_TIME = "من فضلك اكتب وقتًا صحيحًا بصيغة س:د"
+SETTINGS_ERROR_INVALID_UPDATE_URL = "رابط ملف التحديثات لازم يبدأ بـ https:// (أو اتركه فارغًا لتعطيل الفحص)"
 
 # --- Advanced tools / go-live cleanup (Settings, owner only) -----------------
 ADVANCED_TOOLS_TITLE = "أدوات متقدمة"
@@ -138,6 +139,7 @@ UPDATE_CHECK_FAILED_OFFLINE = "تعذر الاتصال بالإنترنت. حا�
 UPDATE_CHECK_FAILED_SSL = "تعذّر الاتصال الآمن. حدّث ويندوز أو نزّل التحديث يدويًا"
 UPDATE_CHECK_FAILED_INVALID_RESPONSE = "رد غير صالح من رابط التحديثات"
 UPDATE_CHECK_REJECTED_DOWNLOAD_HOST = "رابط التحميل غير موثوق، تم رفضه"
+UPDATE_CHECK_SHA256_LABEL = "بصمة التحقق (SHA-256)"
 
 # --- Menu management (Settings-level, owner only) ----------------------------
 MENU_TITLE = "المنيو"

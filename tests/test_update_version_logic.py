@@ -5,12 +5,15 @@ import json
 import pytest
 
 from derby.core.updates.version_logic import (
+    DEFAULT_UPDATE_MANIFEST_URL,
     ManifestError,
     is_allowed_download_url,
     is_newer,
     parse_manifest,
     parse_version,
 )
+
+VALID_SHA256 = "a" * 64
 
 
 def test_parse_version():
@@ -42,10 +45,13 @@ def test_allowed_download_hosts():
 
 
 def test_parse_manifest_valid():
-    raw = json.dumps({"version": "1.0.1", "notes": "notes", "download_url": "https://github.com/a/b"})
+    raw = json.dumps(
+        {"version": "1.0.1", "notes": "notes", "download_url": "https://github.com/a/b", "sha256": VALID_SHA256}
+    )
     manifest = parse_manifest(raw)
     assert manifest["version"] == "1.0.1"
     assert manifest["download_url"] == "https://github.com/a/b"
+    assert manifest["sha256"] == VALID_SHA256
 
 
 def test_parse_manifest_invalid_json():
@@ -59,12 +65,37 @@ def test_parse_manifest_missing_fields():
 
 
 def test_parse_manifest_rejects_non_https_download_url():
-    raw = json.dumps({"version": "1.0.1", "notes": "x", "download_url": "http://github.com/a/b"})
+    raw = json.dumps(
+        {"version": "1.0.1", "notes": "x", "download_url": "http://github.com/a/b", "sha256": VALID_SHA256}
+    )
     with pytest.raises(ManifestError):
         parse_manifest(raw)
 
 
 def test_parse_manifest_rejects_non_github_download_url():
-    raw = json.dumps({"version": "1.0.1", "notes": "x", "download_url": "https://evil.com/a"})
+    raw = json.dumps(
+        {"version": "1.0.1", "notes": "x", "download_url": "https://evil.com/a", "sha256": VALID_SHA256}
+    )
     with pytest.raises(ManifestError):
         parse_manifest(raw)
+
+
+def test_parse_manifest_rejects_missing_sha256():
+    raw = json.dumps({"version": "1.0.1", "notes": "x", "download_url": "https://github.com/a/b"})
+    with pytest.raises(ManifestError):
+        parse_manifest(raw)
+
+
+def test_parse_manifest_rejects_malformed_sha256():
+    raw = json.dumps(
+        {"version": "1.0.1", "notes": "x", "download_url": "https://github.com/a/b", "sha256": "not-hex"}
+    )
+    with pytest.raises(ManifestError):
+        parse_manifest(raw)
+
+
+def test_default_update_manifest_url_points_at_the_public_releases_repo():
+    assert DEFAULT_UPDATE_MANIFEST_URL == (
+        "https://raw.githubusercontent.com/Dabash99/derby-releases/main/version.json"
+    )
+    assert is_allowed_download_url(DEFAULT_UPDATE_MANIFEST_URL)

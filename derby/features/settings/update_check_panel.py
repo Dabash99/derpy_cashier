@@ -80,7 +80,13 @@ class UpdateCheckPanel(QWidget):
             audit_repo.log(self._conn, "update_check", details="up_to_date")
         else:
             self._status_label.setText(
-                ar.UPDATE_CHECK_NEW_VERSION_AVAILABLE.format(version=result.version) + "\n" + result.notes
+                ar.UPDATE_CHECK_NEW_VERSION_AVAILABLE.format(version=result.version)
+                + "\n"
+                + result.notes
+                + "\n"
+                + ar.UPDATE_CHECK_SHA256_LABEL
+                + ": "
+                + result.sha256
             )
             if is_allowed_download_url(result.download_url):
                 self._download_url = result.download_url

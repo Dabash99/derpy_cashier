@@ -9,6 +9,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Dict, Optional
 
+from derby.core.updates.version_logic import DEFAULT_UPDATE_MANIFEST_URL
 from derby.core.utils.paths import default_backup_dir
 from derby.core.utils.platform_info import default_whatsapp_method
 
@@ -31,7 +32,7 @@ DEFAULTS: Dict[str, str] = {
     "backup_folder_primary": "",
     "backup_folder_secondary": "",
     "auto_lock_minutes": "10",
-    "update_manifest_url": "",
+    "update_manifest_url": DEFAULT_UPDATE_MANIFEST_URL,
     # Global login lockout state (Step 5): kept in settings, not per-user,
     # so a restart of the app does not reset an in-progress lockout.
     "login_failed_attempts": "0",

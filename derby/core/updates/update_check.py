@@ -36,11 +36,19 @@ def _fetch_manifest_text(url: str) -> str:
 
 
 class UpdateCheckResult:
-    def __init__(self, up_to_date: bool, version: str = "", notes: str = "", download_url: str = "") -> None:
+    def __init__(
+        self,
+        up_to_date: bool,
+        version: str = "",
+        notes: str = "",
+        download_url: str = "",
+        sha256: str = "",
+    ) -> None:
         self.up_to_date = up_to_date
         self.version = version
         self.notes = notes
         self.download_url = download_url
+        self.sha256 = sha256
 
 
 class UpdateCheckWorker(QThread):
@@ -76,5 +84,6 @@ class UpdateCheckWorker(QThread):
                 version=manifest["version"],
                 notes=manifest["notes"],
                 download_url=manifest["download_url"],
+                sha256=manifest["sha256"],
             )
         )

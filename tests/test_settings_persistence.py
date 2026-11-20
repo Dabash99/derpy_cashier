@@ -5,6 +5,7 @@ from __future__ import annotations
 from derby.core.db import settings_repo
 from derby.core.db.connection import connect
 from derby.core.db.migrations import run_pending_migrations
+from derby.core.updates.version_logic import DEFAULT_UPDATE_MANIFEST_URL
 from derby.core.utils.time_utils import utc_now
 from derby.features.closing import closing_service
 
@@ -87,4 +88,24 @@ def test_ensure_defaults_does_not_overwrite_an_explicitly_set_backup_folder(tmp_
 
     settings_repo.ensure_defaults(conn)  # simulates a second app startup
     assert settings_repo.get(conn, "backup_folder_primary") == str(tmp_path / "chosen_by_owner")
+    conn.close()
+
+
+def test_ensure_defaults_prefills_update_manifest_url(tmp_path):
+    conn = connect(tmp_path / "update_url.db")
+    run_pending_migrations(conn)
+    settings_repo.ensure_defaults(conn)
+
+    assert settings_repo.get(conn, "update_manifest_url") == DEFAULT_UPDATE_MANIFEST_URL
+    conn.close()
+
+
+def test_ensure_defaults_does_not_overwrite_an_explicitly_set_update_manifest_url(tmp_path):
+    conn = connect(tmp_path / "update_url2.db")
+    run_pending_migrations(conn)
+    settings_repo.ensure_defaults(conn)
+    settings_repo.set_value(conn, "update_manifest_url", "")  # owner disabled the check
+
+    settings_repo.ensure_defaults(conn)  # simulates a later app restart
+    assert settings_repo.get(conn, "update_manifest_url") == ""
     conn.close()

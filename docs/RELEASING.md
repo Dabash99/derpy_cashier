@@ -6,6 +6,24 @@
 صاحب الكافيه — دليل الاستخدام اليومي موجود في
 [docs/USER-GUIDE-AR.md](USER-GUIDE-AR.md).
 
+## 0. المستودعان (مهم جدًا)
+
+- **`Dabash99/derpy_cashier`** (هذا المستودع) — لازم يبقى **خاص (Private)**
+  دائمًا. تاريخ Git فيه يحتوي على بيانات قائمة حقيقية (صور منتجات +
+  أسعار) اتضافت في الكوميت `00edea1` ثم أُزيلت من التتبّع بعدها بكوميت
+  لاحق (`38ddf3c`) — لكنها **لسه موجودة بالكامل في تاريخ Git** لأنه ما
+  تم تنظيفه (rewrite). لو اتحول هذا المستودع لعام في أي وقت قبل تنظيف
+  هذا التاريخ، الصور والأسعار الحقيقية تظهر لأي حد يفتح الكوميتات
+  القديمة.
+- **`Dabash99/derby-releases`** — مستودع **عام** منفصل تمامًا، بدون كود
+  مصدري وبدون أي بيانات كافيه. يحتوي فقط على `version.json` و
+  `README.md` على فرع `main`، ومرفقات (Assets) على GitHub Releases
+  (ملف المثبّت `.exe` و `SHA256SUMS.txt`). هذا هو المستودع الذي يقرأه
+  البرنامج عند الضغط على "فحص التحديثات".
+
+لا يوجد فرع orphan `releases` داخل `derpy_cashier` — هذه الفكرة القديمة
+أُلغيت لصالح المستودع المنفصل أعلاه.
+
 ## 1. رفع رقم الإصدار
 
 الإصدار موجود في مكان واحد فقط: `derby/__init__.py` (`__version__`).
@@ -13,88 +31,83 @@
 يوجد اختبار (`tests/test_policy.py::test_version_matches_pyproject`)
 يفشل تلقائيًا لو اختلفا.
 
-```bash
-# تحقق أن كل الاختبارات ما زالت ناجحة بعد التعديل
-.venv\Scripts\python.exe -m pytest
-.venv\Scripts\python.exe -m ruff check .
-```
-
-## 2. البناء (Build)
+## 2. أمر واحد لكل شيء: `tools/make_release.py`
 
 ```bash
-build.bat
+.venv\Scripts\python.exe tools\make_release.py
 ```
 
-هذا يشغّل (بالترتيب، ويتوقف فورًا لو فشلت أي خطوة): `ruff check .`، ثم
-كل الاختبارات، ثم PyInstaller (حسب `derby.spec`)، ثم يتحقق تلقائيًا من
-الناتج (`dist\Derby\Derby.exe --selftest` لازم يرجع بنجاح، لا توجد ملفات
-QtNetwork/QtSvg، يطبع حجم المجلد وعدد الملفات وبصمة SHA-256).
+يشغّل بالترتيب، ويتوقف فورًا (برسالة واضحة) لو فشلت أي خطوة:
 
-## 3. المثبّت (Installer)
+1. `ruff check .`
+2. `pytest -q` (كل الاختبارات، بما فيها `tests/test_policy.py`)
+3. `tools/build.py` — PyInstaller + `--selftest` على النسخة المبنية
+4. `tools/build_installer.py` — يحتاج **Inno Setup 6** (نزّله من
+   https://jrsoftware.org/isdl.php لو غير موجود؛ السكربت يبحث عنه في
+   مساراته الافتراضية ويطبع أمر الترجمة اليدوي لو ملقاهوش). يترجم
+   `installer\derby.iss`، ثم يثبّت المثبّت تثبيتًا صامتًا في مجلد
+   **مؤقت** (ليس Program Files الحقيقي)، يشغّل `Derby.exe --selftest`
+   من داخل التثبيت، يلغي التثبيت صامتًا، ويتأكد أن مجلد التثبيت فرغ
+   تمامًا وأن بيانات الاختبار لم تُمسّ — ويكتب `release\SHA256SUMS.txt`.
+5. يحسب بصمة SHA-256 الحقيقية لـ `release\Derby-Setup-<version>.exe`
+   ويكتب `release\version.json` كاملًا (الإصدار، نص عربي قصير، رابط
+   التحميل على `derby-releases`، البصمة).
+6. يكتب `release\public\version.json` و `release\public\README.md` —
+   **هذا هو المجلد الوحيد** الذي يُفترض نسخ محتواه لمستودع
+   `derby-releases`.
+7. يشغّل `tools/check_public_files.py` على `release\public\` —
+   يتأكد أنه يحتوي فقط على الملفين المذكورين، وأن `version.json` ما فيه
+   أي بيانات شخصية (مسار حقيقي، إيميل، رقم تليفون).
+8. يطبع خطوات النسخ/الرفع اليدوية بالضبط (الخطوة 3 تحت).
 
-يحتاج Inno Setup 6 (غير مثبّت تلقائيًا — نزّله من
-https://jrsoftware.org/isdl.php إذا لم يكن موجودًا).
+هذا السكربت **لا يلمس git أبدًا** (لا فرع، لا worktree، لا commit)، ولا
+يرفع (`push`) ولا ينشئ Tag أو GitHub Release، ولا يتصل بالإنترنت في أي
+لحظة. أنت من يقوم بهذه الخطوات بعد مراجعة التقرير.
 
-```bash
-.venv\Scripts\python.exe tools\build_installer.py
-```
+## 3. الخطوات اليدوية بعد نجاح `make_release.py`
 
-هذا يعيد توليد `installer\version.iss` من رقم الإصدار الحالي، يبني
-`release\Derby-Setup-<version>.exe` عبر Inno Setup، ثم يتحقق منه تلقائيًا:
-تثبيت صامت في مجلد مؤقت، تشغيل `--selftest`، إلغاء تثبيت صامت، والتأكد
-أن مجلد التثبيت فرغ تمامًا وأن بيانات الاختبار لم تُمسّ. لا يثبّت أبدًا
-في Program Files الحقيقي ولا ينشئ اختصارات حقيقية أثناء هذا التحقق.
+1. افتح نسخة محلية (`git clone`) من `Dabash99/derby-releases` على جهازك،
+   وانسخ لها:
+   ```
+   release\public\version.json  ->  <نسخة derby-releases>\version.json
+   release\public\README.md     ->  <نسخة derby-releases>\README.md
+   ```
+   ثم من داخل تلك النسخة:
+   ```bash
+   git add version.json README.md
+   git commit -m "Release v1.0.0"
+   git push origin main
+   ```
+2. على GitHub، أنشئ Release جديد على `Dabash99/derby-releases` بعلامة
+   Tag مثل `v1.0.0`، وارفع كمرفقات (Assets):
+   - `release\Derby-Setup-1.0.0.exe`
+   - `release\SHA256SUMS.txt`
+3. تأكد أن رابط الـ raw يفتح في المتصفح:
+   ```
+   https://raw.githubusercontent.com/Dabash99/derby-releases/main/version.json
+   ```
+4. في البرنامج: الإعدادات ← رابط ملف التحديثات — مُعبّى تلقائيًا
+   بهذا الرابط بالضبط كقيمة افتراضية (`update_manifest_url`)، والمالك
+   يقدر يغيّره. اضغط "فحص التحديثات" وتأكد إنه يجد الإصدار الجديد،
+   ويعرض النص العربي وبصمة SHA-256، وزر "تحميل" يفتح المتصفح على رابط
+   GitHub (لا يحمّل الملف داخل البرنامج نفسه).
 
-إذا لم يكن Inno Setup مثبّتًا، تحصل على رسالة توضّح بالضبط من أين تحمّله
-وأمر الترجمة (compile) اليدوي بالضبط — ملف `installer\derby.iss` يبقى
-جاهزًا ومكتملًا بغض النظر.
+## 4. كيف تختبر مسار التحديث بالكامل (بدون لمس المستودع العام الحقيقي)
 
-## 4. نشر إصدار على GitHub (مستودع عام Public)
+1. ثبّت نسخة 1.0.0 (من المثبّت الذي بنيته).
+2. ارفع رقم الإصدار لـ 1.0.1 محليًا وشغّل `tools/make_release.py` تاني
+   (يبني installer 1.0.1 و `release\version.json` الخاص به).
+3. لا تلمس `derby-releases` الحقيقي لتجربة هذا — بدّل مؤقتًا رابط
+   `update_manifest_url` في الإعدادات إلى ملف `version.json` المحلي
+   (مثلًا عبر سيرفر HTTP محلي بسيط، أو حتى مباشرة لو عدّلت الكود
+   مؤقتًا ليقرأ ملف محلي في بيئة تطوير) — المهم إنه رابط اختباري غير
+   حقيقي، نفس فلسفة `tests/test_update_version_logic.py` و
+   `tests/test_update_check_panel.py` التي تستخدم خادمًا مزيّفًا
+   (fake server) أو mocked opener بدلًا من أي اتصال حقيقي.
+4. تأكد أن الحوار يعرض "يوجد إصدار جديد: 1.0.1" والنص العربي والبصمة،
+   وأن زر "تحميل" يفتح الرابط الصحيح.
 
-1. أنشئ إصدار (Release) جديد على GitHub، بعلامة Tag مثل `v0.2.0`
-   (يطابق رقم الإصدار في `derby/__init__.py`).
-2. ارفع `release\Derby-Setup-<version>.exe` و `release\SHA256SUMS.txt`
-   كمرفقات (Assets) على هذا الإصدار.
-3. المستودع **لازم يكون عام (Public)** — رابط التحميل المباشر لا يعمل
-   إلا لو كان المستودع عامًا.
-
-## 5. نشر version.json (لفحص التحديثات اليدوي)
-
-```bash
-.venv\Scripts\python.exe tools\write_version_json.py
-```
-
-هذا يولّد `release\version.json` بالشكل بالضبط الذي يتوقعه البرنامج
-(`derby/core/updates/version_logic.py`):
-
-```json
-{
-  "version": "0.2.0",
-  "notes": "نص قصير يظهر للمالك",
-  "download_url": "https://github.com/<owner>/<repo>/releases/download/v0.2.0/Derby-Setup-0.2.0.exe"
-}
-```
-
-قبل رفعه، افتح الملف وعدّل `download_url` ليطابق رابط التحميل الحقيقي
-من الإصدار الذي رفعته في الخطوة 4 (الأداة تكتب رابطًا نموذجيًا فقط).
-`download_url` لازم يكون `https://` وعلى نطاق `github.com` أو
-`objects.githubusercontent.com` أو `raw.githubusercontent.com` — أي نطاق
-آخر يرفضه البرنامج نفسه كحماية إضافية.
-
-**أين تنشر `version.json`؟** ضمن نفس إصدار GitHub (كمرفق Asset) هو
-الأبسط. ثم احسب رابط "raw" المباشر له (مثال لو رفعته كمرفق على الإصدار
-`v0.2.0` في مستودع `owner/repo`):
-
-```
-https://github.com/owner/repo/releases/download/v0.2.0/version.json
-```
-
-انسخ هذا الرابط إلى: الإعدادات ← رابط ملف التحديثات (`update_manifest_url`)
-— هذا هو الرابط الذي يضغط عليه صاحب الكافيه "فحص التحديثات" ليفحصه.
-فحص التحديثات **يدوي فقط** (زر واحد في الإعدادات) — البرنامج لا يفحص
-شيئًا تلقائيًا ولا يتصل بالإنترنت في أي وقت آخر.
-
-## 6. ضمانات الترقية (Upgrade guarantees)
+## 5. ضمانات الترقية (Upgrade guarantees)
 
 - **البيانات خارج مجلد التثبيت دائمًا**: قاعدة البيانات، الصور،
   الإيصالات، والنسخ الاحتياطية كلها في `%APPDATA%\Derby` و
@@ -116,19 +129,33 @@ https://github.com/owner/repo/releases/download/v0.2.0/version.json
 ## English summary
 
 Version lives in one place: `derby/__init__.py` (`__version__`), kept
-in sync with `pyproject.toml` by a test. `build.bat` runs ruff + the
-full test suite + PyInstaller (`derby.spec`) and verifies the frozen
-output automatically. `tools\build_installer.py` compiles
-`installer\derby.iss` with Inno Setup 6 (if installed) and verifies a
-full silent install/selftest/uninstall cycle in temp directories only.
-Publish the installer + `SHA256SUMS.txt` as GitHub Release assets in a
-**public** repo; generate `release\version.json` with
-`tools\write_version_json.py`, fix its placeholder `download_url`, host
-it (e.g. as another release asset), and put its raw URL into
-Settings -> `update_manifest_url` -- the owner's manual "Check for
-Updates" button is the only thing that ever reads it; nothing else in
-the app makes a network call. Upgrades never touch
-`%APPDATA%\Derby`/`Documents\Derby`; database migrations take a
+in sync with `pyproject.toml` by a test. Releases are split across two
+repos: **`Dabash99/derpy_cashier`** (this repo, source code) must stay
+**private** -- its git history still contains real cafe menu
+photos/prices from commit `00edea1`, never cleaned from history.
+**`Dabash99/derby-releases`** is a separate **public** repo holding
+only `version.json` + `README.md` on `main`, with installer assets on
+its GitHub Releases. There is no orphan `releases` branch in this repo
+-- that earlier idea was dropped in favor of the separate repo.
+
+`tools/make_release.py` is the single release command: it runs
+ruff + the full test suite, `tools/build.py` (PyInstaller +
+`--selftest`), `tools/build_installer.py` (Inno Setup 6 compile + a
+full silent install/`--selftest`/uninstall verification cycle, entirely
+in temp directories), computes the installer's real SHA-256, writes
+`release/version.json`, and writes the public-safe copy to
+`release/public/` (checked by `tools/check_public_files.py` for stray
+personal data). It never touches git, never pushes, never creates a
+release, and never makes a network request -- copying
+`release/public/*` into a local `derby-releases` clone, committing,
+pushing, and creating the GitHub Release are manual steps printed at
+the end (and repeated in section 3 above).
+
+Settings -> `update_manifest_url` is prefilled by default with
+`https://raw.githubusercontent.com/Dabash99/derby-releases/main/version.json`
+(the owner can still edit or clear it); the owner's manual "Check for
+Updates" button is the only thing that ever reads it. Upgrades never
+touch `%APPDATA%\Derby`/`Documents\Derby`; database migrations take a
 verified backup first and abort (with a clear error) rather than risk
 the data if that backup fails; any backup can be restored from the
 Settings restore screen as a rollback.

@@ -132,7 +132,12 @@ This file covers engineering rules and conventions.
                          make_icon.py, make_installer_images.py,
                          make_user_guide_pdf.py, preview_screens.py,
                          build.py, build_installer.py, version_info.py,
-                         write_installer_version.py, write_version_json.py
+                         write_installer_version.py, write_version_json.py,
+                         make_release.py (single release command --
+                         quality gates + build + installer + version.json
+                         + release/public/, see docs/RELEASING.md),
+                         check_public_files.py (privacy guard for
+                         release/public/, also called by make_release.py)
                          (may import QtSvg; never shipped/frozen)
   installer/             derby.iss (Inno Setup) + version.iss (generated) + redist/
   derby.spec              PyInstaller spec (one-dir, see tools/build.py)

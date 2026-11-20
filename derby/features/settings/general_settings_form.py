@@ -79,12 +79,17 @@ class GeneralSettingsForm(QWidget):
             self._error_label.setText(ar.SETTINGS_ERROR_INVALID_TIME)
             return
 
+        update_url_text = self._update_url_input.text().strip()
+        if update_url_text and not update_url_text.lower().startswith("https://"):
+            self._error_label.setText(ar.SETTINGS_ERROR_INVALID_UPDATE_URL)
+            return
+
         settings_repo.set_value(self._conn, "cafe_name", self._cafe_name_input.text().strip())
         settings_repo.set_value(self._conn, "business_close_time", close_time_text)
         settings_repo.set_value(self._conn, "ps_min_minutes", str(self._ps_min_minutes_input.value()))
         settings_repo.set_value(self._conn, "rounding_step_egp", str(self._rounding_step_input.value()))
         settings_repo.set_value(self._conn, "auto_lock_minutes", str(self._auto_lock_input.value()))
-        settings_repo.set_value(self._conn, "update_manifest_url", self._update_url_input.text().strip())
+        settings_repo.set_value(self._conn, "update_manifest_url", update_url_text)
 
         self._error_label.setText("")
         self.saved.emit()

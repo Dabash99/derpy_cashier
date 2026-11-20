@@ -250,7 +250,8 @@ def run_selftest() -> _Results:
         manifest = version_logic.parse_manifest(
             '{"version": "0.2.0", '
             '"download_url": "https://github.com/example/derby/releases/download/v0.2.0/Derby-Setup-0.2.0.exe", '
-            '"notes": "test"}'
+            '"notes": "test", '
+            '"sha256": "' + ("a" * 64) + '"}'
         )
         assert manifest["version"] == "0.2.0"
         assert version_logic.is_newer("0.1.0", "0.2.0") is True

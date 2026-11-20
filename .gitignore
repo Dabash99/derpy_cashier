@@ -13,6 +13,8 @@ release/
 *.db-journal
 *.db-wal
 *.db-shm
+*.log
+backups/
 
 # Real cafe data (menu.csv + photos) -- not committed automatically;
 # the owner decides if/how this goes into version control.
