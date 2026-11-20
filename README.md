@@ -8,6 +8,15 @@ the whole codebase is a manual "check for updates" button.
 See [CLAUDE.md](CLAUDE.md) for engineering rules/conventions and
 [docs/SPEC.md](docs/SPEC.md) for the full approved spec and phase plan.
 
+## تحميل / Download
+
+**[Download the latest Derby installer](https://github.com/Dabash99/derpy_cashier/releases/latest)**
+
+Run the downloaded `Derby-Setup-*.exe` on Windows 7 SP1 (64-bit) or
+Windows 10 (64-bit) and follow the installer. If Windows shows a blue
+SmartScreen warning, click **"More info"** then **"Run anyway"** — this
+is normal for a new app without a paid code-signing certificate.
+
 ## Status
 
 | Phase | What | Status |

@@ -44,6 +44,12 @@ def test_derby_iss_exists_and_has_required_directives():
     # "<guid>" as a named constant. See the comment above this line in
     # installer/derby.iss and docs/RELEASING.md.
     assert "AppId={{#MyAppId}" in text
+    # Lets tools/build_installer.py's automated verification pass
+    # /CURRENTUSER to skip the UAC elevation prompt a real end-user
+    # install still gets by default (PrivilegesRequired=admin) -- see
+    # the comment above these two lines in installer/derby.iss.
+    assert "PrivilegesRequired=admin" in text
+    assert "PrivilegesRequiredOverridesAllowed=commandline" in text
     assert "WizardImageFile=wizard-image.bmp" in text
     assert "WizardSmallImageFile=wizard-small-image.bmp" in text
     assert "SetupIconFile=..\\assets\\derby.ico" in text

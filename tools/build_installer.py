@@ -98,8 +98,19 @@ def verify_installer(installer_path: Path) -> None:
     install_dir = Path(tempfile.mkdtemp(prefix="derby_installer_verify_"))
     data_dir = Path(tempfile.mkdtemp(prefix="derby_installer_verify_data_"))
     print("Silent-installing into {0} (never Program Files for this check) ...".format(install_dir))
+    # /CURRENTUSER (allowed via PrivilegesRequiredOverridesAllowed=commandline
+    # in installer/derby.iss) skips the admin/UAC elevation a real end-user
+    # install would normally request -- there is nobody here to click a UAC
+    # consent prompt, so this verification must never depend on one.
     result = _run(
-        [str(installer_path), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NOICONS", "/DIR={0}".format(install_dir)],
+        [
+            str(installer_path),
+            "/CURRENTUSER",
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NOICONS",
+            "/DIR={0}".format(install_dir),
+        ],
         timeout=180,
     )
     if result.returncode != 0:

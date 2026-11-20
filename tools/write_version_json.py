@@ -2,9 +2,9 @@
 fetches when the owner clicks "فحص التحديثات". This is a quick preview/dev
 tool only: for a real release, use tools/make_release.py instead, which
 computes the real installer sha256 and runs the full build+verify
-pipeline first. See docs/RELEASING.md for the publishing steps (the
-"releases" repo is Dabash99/derby-releases, kept separate and public --
-the source repo stays private).
+pipeline first. See docs/RELEASING.md for the publishing steps (release
+assets and an orphan "releases" branch both live in this same repo,
+Dabash99/derpy_cashier).
 
 If release/Derby-Setup-<version>.exe already exists (from a previous
 build), its real sha256 is used; otherwise a placeholder of 64 zeros is
@@ -31,10 +31,9 @@ RELEASE_DIR = PROJECT_ROOT / "release"
 # Must be an https:// URL on github.com, objects.githubusercontent.com,
 # or raw.githubusercontent.com (see
 # derby/core/updates/version_logic.py:ALLOWED_DOWNLOAD_HOSTS; anything
-# else is rejected by the app itself as an extra safety net). Points at
-# the separate public "releases" repo, not the private source repo.
+# else is rejected by the app itself as an extra safety net).
 RELEASE_DOWNLOAD_URL = (
-    "https://github.com/Dabash99/derby-releases/releases/download/v{version}/Derby-Setup-{version}.exe"
+    "https://github.com/Dabash99/derpy_cashier/releases/download/v{version}/Derby-Setup-{version}.exe"
 )
 
 NOTES = "إصدار ديربي {version}"

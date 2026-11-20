@@ -1,16 +1,13 @@
-"""Privacy guard for release\\public\\ -- the ONLY folder whose contents are
-meant to be copied into the separate public repo (Dabash99/derby-releases).
+"""Privacy guard for a "public-safe" directory -- either
+release\\public\\ (tools/make_release.py's pre-check copy) or the local
+clone of this repo's orphan "releases" branch
+(build\\releases-clone\\, maintained by tools/publish_release.py). Both
+are meant to hold only version.json + README.md (the clone also gets
+releases-history.json) -- never source code, never personal data (real
+paths, phone numbers, emails) baked into version.json.
 
-The source repo (derpy_cashier) must stay PRIVATE: its git history
-contains real cafe menu photos and prices (commit 00edea1, never cleaned
-from history -- see docs/RELEASING.md). release\\public\\ is the one
-place tools/make_release.py writes files that are safe to make public,
-and this script is the automated check that it really is just
-version.json + README.md, with no personal data (real paths, phone
-numbers, emails) baked into version.json.
-
-Used both as a standalone check (tools/make_release.py runs it after
-writing release\\public\\) and as a library function for tests.
+Used both as a standalone check and as a library function (by
+tools/make_release.py, tools/publish_release.py, and tests).
 
 Usage:
     .venv\\Scripts\\python.exe tools\\check_public_files.py [public_dir]
@@ -26,7 +23,10 @@ from typing import List
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PUBLIC_DIR = PROJECT_ROOT / "release" / "public"
 
-ALLOWED_FILENAMES = {"version.json", "README.md"}
+REQUIRED_FILENAMES = {"version.json", "README.md"}
+# Only present in the releases-branch clone, not in release/public/.
+OPTIONAL_FILENAMES = {"releases-history.json"}
+ALLOWED_FILENAMES = REQUIRED_FILENAMES | OPTIONAL_FILENAMES
 ALLOWED_VERSION_JSON_KEYS = {"version", "notes", "download_url", "sha256"}
 
 # A real Windows user/profile path, an email address, or a long run of
@@ -51,7 +51,7 @@ def check_public_dir(public_dir: Path) -> List[str]:
     extra = actual_names - ALLOWED_FILENAMES
     if extra:
         problems.append("unexpected file(s) in {0}: {1}".format(public_dir, sorted(extra)))
-    missing = ALLOWED_FILENAMES - actual_names
+    missing = REQUIRED_FILENAMES - actual_names
     if missing:
         problems.append("missing required file(s) in {0}: {1}".format(public_dir, sorted(missing)))
 
@@ -93,6 +93,26 @@ def check_public_dir(public_dir: Path) -> List[str]:
                 problems.append(
                     "README.md contains what looks like personal data (matched {0!r})".format(pattern.pattern)
                 )
+
+    history_path = public_dir / "releases-history.json"
+    if history_path.exists():
+        try:
+            history = json.loads(history_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            problems.append("releases-history.json is not valid JSON: {0}".format(error))
+            history = []
+
+        if isinstance(history, list):
+            for entry in history:
+                if not isinstance(entry, dict):
+                    continue
+                notes_text = entry.get("notes", "") if isinstance(entry.get("notes"), str) else ""
+                for pattern in _SUSPICIOUS_PATTERNS:
+                    if pattern.search(notes_text):
+                        problems.append(
+                            "releases-history.json has an entry whose notes look like personal data "
+                            "(matched {0!r})".format(pattern.pattern)
+                        )
 
     return problems
 

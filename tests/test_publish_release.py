@@ -231,3 +231,85 @@ def test_commit_and_push_commits_and_pushes_when_dirty(tmp_path, monkeypatch):
 
     assert any("commit" in args for args in calls)
     assert any("push" in args for args in calls)
+
+
+# ---------------------------------------------------------------------------
+# Orphan "releases" branch handling
+# ---------------------------------------------------------------------------
+
+
+def test_clear_working_tree_except_git_removes_everything_but_dot_git(tmp_path):
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "config").write_text("x", encoding="utf-8")
+    (tmp_path / "derby").mkdir()
+    (tmp_path / "derby" / "app.py").write_text("x", encoding="utf-8")
+    (tmp_path / "README.md").write_text("x", encoding="utf-8")
+
+    publish_release._clear_working_tree_except_git(tmp_path)
+
+    remaining = {p.name for p in tmp_path.iterdir()}
+    assert remaining == {".git"}
+    assert (tmp_path / ".git" / "config").exists()
+
+
+def test_ensure_releases_branch_checked_out_uses_existing_local_branch(tmp_path, monkeypatch):
+    monkeypatch.setattr(publish_release, "CLONE_DIR", tmp_path)
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if "show-ref" in args:
+            return _fake_completed(returncode=0)  # local branch exists
+        if "ls-remote" in args:
+            return _fake_completed(returncode=0)  # remote branch exists too
+        return _fake_completed(returncode=0)
+
+    monkeypatch.setattr(publish_release, "_run", fake_run)
+    publish_release._ensure_releases_branch_checked_out()
+
+    assert any(args[3:5] == ["checkout", "releases"] for args in calls)
+    assert any("pull" in args for args in calls)
+    assert not any("--orphan" in args for args in calls)
+    assert not any(args[3:5] == ["checkout", "-b"] for args in calls)
+
+
+def test_ensure_releases_branch_checked_out_tracks_existing_remote_branch(tmp_path, monkeypatch):
+    monkeypatch.setattr(publish_release, "CLONE_DIR", tmp_path)
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if "show-ref" in args:
+            return _fake_completed(returncode=1)  # no local branch yet
+        if "ls-remote" in args:
+            return _fake_completed(returncode=0)  # but remote has it
+        return _fake_completed(returncode=0)
+
+    monkeypatch.setattr(publish_release, "_run", fake_run)
+    publish_release._ensure_releases_branch_checked_out()
+
+    assert any(args[3:6] == ["checkout", "-b", "releases"] for args in calls)
+    assert not any("--orphan" in args for args in calls)
+
+
+def test_ensure_releases_branch_checked_out_creates_orphan_branch_when_neither_exists(tmp_path, monkeypatch):
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "some_source_file.py").write_text("stale content", encoding="utf-8")
+    monkeypatch.setattr(publish_release, "CLONE_DIR", tmp_path)
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if "show-ref" in args:
+            return _fake_completed(returncode=1)  # no local branch
+        if "ls-remote" in args:
+            return _fake_completed(returncode=1)  # no remote branch either
+        return _fake_completed(returncode=0)
+
+    monkeypatch.setattr(publish_release, "_run", fake_run)
+    publish_release._ensure_releases_branch_checked_out()
+
+    assert any("--orphan" in args for args in calls)
+    # The stale file left over from whatever branch this was orphaned
+    # from must be gone -- only .git remains.
+    assert {p.name for p in tmp_path.iterdir()} == {".git"}

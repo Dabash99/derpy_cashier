@@ -33,6 +33,15 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\Derby
 DefaultGroupName=Derby
 DisableProgramGroupPage=yes
+; Default (admin, per-machine Program Files install, one shared copy)
+; is unchanged for a real end user -- they still get the normal UAC
+; prompt. "commandline" lets tools/build_installer.py's automated
+; silent-install verification pass /CURRENTUSER to install into a temp
+; directory WITHOUT requesting elevation, since that verification must
+; never depend on a UAC consent prompt being clickable (there is no one
+; there to click it in an automated/headless run).
+PrivilegesRequired=admin
+PrivilegesRequiredOverridesAllowed=commandline
 ; "x64compatible" (Inno Setup 6.3+) is the recommended identifier over
 ; the deprecated "x64" -- matches real x64 Windows (7 SP1, 10) without
 ; pulling in ARM64's x64 emulation layer, which this project doesn't

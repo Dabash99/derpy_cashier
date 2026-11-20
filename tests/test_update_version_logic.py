@@ -94,8 +94,8 @@ def test_parse_manifest_rejects_malformed_sha256():
         parse_manifest(raw)
 
 
-def test_default_update_manifest_url_points_at_the_public_releases_repo():
+def test_default_update_manifest_url_points_at_the_releases_branch():
     assert DEFAULT_UPDATE_MANIFEST_URL == (
-        "https://raw.githubusercontent.com/Dabash99/derby-releases/main/version.json"
+        "https://raw.githubusercontent.com/Dabash99/derpy_cashier/releases/version.json"
     )
     assert is_allowed_download_url(DEFAULT_UPDATE_MANIFEST_URL)

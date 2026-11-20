@@ -14,7 +14,7 @@ _SPEC.loader.exec_module(check_public_files)
 VALID_MANIFEST = {
     "version": "1.0.0",
     "notes": "إصدار ديربي 1.0.0",
-    "download_url": "https://github.com/Dabash99/derby-releases/releases/download/v1.0.0/Derby-Setup-1.0.0.exe",
+    "download_url": "https://github.com/Dabash99/derpy_cashier/releases/download/v1.0.0/Derby-Setup-1.0.0.exe",
     "sha256": "a" * 64,
 }
 
@@ -70,6 +70,23 @@ def test_real_sha256_and_version_digits_do_not_false_positive(tmp_path):
     # mistaken for a phone number.
     public_dir = _write_valid_public_dir(tmp_path)
     assert check_public_files.check_public_dir(public_dir) == []
+
+
+def test_releases_history_json_is_allowed_and_not_required(tmp_path):
+    public_dir = _write_valid_public_dir(tmp_path)
+    history = [{"version": "1.0.0", "date": "2026-01-01", "notes": "أول إصدار"}]
+    (public_dir / "releases-history.json").write_text(json.dumps(history), encoding="utf-8")
+
+    assert check_public_files.check_public_dir(public_dir) == []
+
+
+def test_releases_history_json_with_personal_data_is_flagged(tmp_path):
+    public_dir = _write_valid_public_dir(tmp_path)
+    history = [{"version": "1.0.0", "date": "2026-01-01", "notes": "اتصل بينا على 201234567890"}]
+    (public_dir / "releases-history.json").write_text(json.dumps(history), encoding="utf-8")
+
+    problems = check_public_files.check_public_dir(public_dir)
+    assert problems
 
 
 def test_unexpected_key_in_version_json_is_flagged(tmp_path):

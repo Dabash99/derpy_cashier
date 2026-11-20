@@ -3,11 +3,15 @@ build, the Inno Setup installer (compiled + silently
 installed/--selftest'ed/uninstalled -- see tools/build_installer.py),
 then the files meant to go public.
 
-The source repo (derpy_cashier) stays PRIVATE -- its git history has
-real cafe menu data in it (commit 00edea1, see docs/RELEASING.md). Only
-release\\public\\version.json and release\\public\\README.md are ever
-meant to leave this machine, by being copied by hand into a separate
-local clone of the public repo Dabash99/derby-releases. This script:
+Release assets (the installer, SHA256SUMS.txt) and an orphan "releases"
+branch (version.json, README.md, releases-history.json -- no source
+code) both live in this same repo, Dabash99/derpy_cashier (public --
+see docs/RELEASING.md for what that means for this repo's git history).
+Only release\\public\\version.json and release\\public\\README.md are
+ever meant to leave this machine as-is, by being handed to
+tools/publish_release.py (which maintains its own separate clone under
+build\\releases-clone, never this checkout's working tree). This
+script itself:
 
   - NEVER touches git (no branch, no worktree, no commit) in this repo
     or anywhere else.
@@ -28,9 +32,10 @@ Steps:
   4. tools/build_installer.py (Inno Setup 6 compile + silent
      install/--selftest/uninstall verification + release\\SHA256SUMS.txt)
   5. release\\version.json: real sha256 of the built installer, and the
-     download_url for the public releases repo.
-  6. release\\public\\version.json + release\\public\\README.md -- the
-     only two files meant to be copied into derby-releases.
+     download_url for this repo's GitHub Release.
+  6. release\\public\\version.json + release\\public\\README.md -- a
+     privacy-checked preview of what tools/publish_release.py will push
+     to the orphan "releases" branch.
   7. tools/check_public_files.py against release\\public\\.
   8. Prints the exact manual copy/push steps -- or, with --publish, runs
      tools/publish_release.py to do them (still asks to confirm unless
@@ -56,16 +61,15 @@ PUBLIC_DIR = RELEASE_DIR / "public"
 sys.path.insert(0, str(PROJECT_ROOT))
 
 DOWNLOAD_URL_TEMPLATE = (
-    "https://github.com/Dabash99/derby-releases/releases/download/v{version}/Derby-Setup-{version}.exe"
+    "https://github.com/Dabash99/derpy_cashier/releases/download/v{version}/Derby-Setup-{version}.exe"
 )
 NOTES_TEMPLATE = "إصدار ديربي {version}"
 
 PUBLIC_README = """# Derby releases
 
-This repo publishes `version.json` for Derby's manual "فحص التحديثات"
-(Check for Updates) button, plus installer files attached to GitHub
-Releases here. It contains no source code and no cafe data -- see the
-main app repo (private) for that.
+This file previews what the "releases" branch of this repo will hold:
+`version.json` for Derby's manual "فحص التحديثات" (Check for Updates)
+button. It contains no source code and no cafe data.
 """
 
 
@@ -162,32 +166,29 @@ def print_manual_steps(version: str) -> None:
     installer_name = "Derby-Setup-{0}.exe".format(version)
     print()
     print("=" * 70)
-    print("Build finished. Nothing was pushed, tagged, or released -- do these by hand:")
+    print("Build finished. Nothing was pushed, tagged, or released -- do these by hand,")
+    print("or run: .venv\\Scripts\\python.exe tools\\publish_release.py (does all of it):")
     print("=" * 70)
     print()
-    print("1. Copy the public manifest into your local clone of derby-releases:")
-    print("     copy {0}\\public\\version.json  <path-to-derby-releases-clone>\\version.json".format(RELEASE_DIR))
-    print("     copy {0}\\public\\README.md     <path-to-derby-releases-clone>\\README.md".format(RELEASE_DIR))
-    print("   Then, inside that clone:")
-    print("     git add version.json README.md")
-    print('     git commit -m "Release v{0}"'.format(version))
-    print("     git push origin main")
+    print("1. In a separate local clone of this repo's orphan 'releases' branch")
+    print("   (build\\releases-clone\\, created automatically by publish_release.py),")
+    print("   copy and commit:")
+    print("     {0}\\public\\version.json  -> version.json".format(RELEASE_DIR))
+    print("     {0}\\public\\README.md     -> README.md".format(RELEASE_DIR))
+    print('     git commit -m "Release v{0}"  &&  git push origin releases'.format(version))
     print()
-    print("2. On GitHub, create a Release on Dabash99/derby-releases tagged v{0},".format(version))
+    print("2. On GitHub, create a Release on Dabash99/derpy_cashier tagged v{0},".format(version))
     print("   and upload these two files as assets:")
     print("     {0}\\{1}".format(RELEASE_DIR, installer_name))
     print("     {0}\\SHA256SUMS.txt".format(RELEASE_DIR))
     print()
     print("3. Verify the raw manifest URL opens in a browser:")
-    print("     https://raw.githubusercontent.com/Dabash99/derby-releases/main/version.json")
+    print("     https://raw.githubusercontent.com/Dabash99/derpy_cashier/releases/version.json")
     print()
     print("4. In Derby's Settings -> رابط ملف التحديثات, confirm it is prefilled with that")
     print("   same URL (it is, by default), then click فحص التحديثات to confirm it finds v{0}.".format(version))
     print()
-    print("Reminder: derpy_cashier (this repo) must stay PRIVATE -- its git history still")
-    print("contains real cafe menu photos/prices (commit 00edea1).")
-    print()
-    print("Or, next time, pass --publish to run tools/publish_release.py automatically")
+    print("Or pass --publish to this script to run tools/publish_release.py automatically")
     print("once this build finishes (it will still ask to confirm unless you also pass --yes).")
 
 

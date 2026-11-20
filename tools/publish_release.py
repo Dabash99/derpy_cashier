@@ -1,8 +1,9 @@
 """Dev-time ONLY (never imported by the app, never part of the
 PyInstaller build/installer). Publishes a release already built by
-tools/make_release.py to the separate PUBLIC repo Dabash99/derby-releases
--- the source repo (derpy_cashier) stays private (see docs/RELEASING.md;
-its git history still has real cafe menu data, commit 00edea1).
+tools/make_release.py to THIS SAME repo, Dabash99/derpy_cashier (public):
+the installer + SHA256SUMS.txt go on a tagged GitHub Release, and
+version.json/README.md/releases-history.json go on an orphan branch
+named "releases" that never holds any source code. See docs/RELEASING.md.
 
 Uses ONLY subprocess calls to `git` and `gh` (the GitHub CLI) -- no
 Python network library is imported here, matching CLAUDE.md's "no
@@ -10,12 +11,17 @@ networking" rule for the app itself (this is a separate dev tool, run
 explicitly by the owner, not shipped, not exercised by tests/test_policy.py
 which only scans derby/).
 
+This script NEVER switches branches or otherwise touches the working
+tree of the main checkout (the one this file lives in) -- all git work
+happens in a SEPARATE clone of the same repo under build\\releases-clone.
+
 Steps: check preconditions -> print a summary and ask for confirmation
-(unless --yes) -> clone/update a local working copy of derby-releases
-under build\\derby-releases (never touches this repo's own git state) ->
-update version.json/README.md/releases-history.json there -> commit +
-push (skipped if nothing changed, e.g. a previous run already pushed but
-the GitHub Release step then failed) -> `gh release create` with the
+(unless --yes) -> clone/update that separate working copy and check out
+its "releases" branch (creating it as an orphan branch with a first
+commit if it doesn't exist remotely yet) -> update
+version.json/README.md/releases-history.json there -> commit + push
+(skipped if nothing changed, e.g. a previous run already pushed but the
+GitHub Release step then failed) -> `gh release create` with the
 installer + SHA256SUMS.txt -> verify the published assets' sizes match
 the local files.
 
@@ -28,6 +34,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 from datetime import date
@@ -39,8 +46,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 RELEASE_DIR = PROJECT_ROOT / "release"
 PUBLIC_DIR = RELEASE_DIR / "public"
-CLONE_DIR = PROJECT_ROOT / "build" / "derby-releases"
-REPO = "Dabash99/derby-releases"
+CLONE_DIR = PROJECT_ROOT / "build" / "releases-clone"
+REPO = "Dabash99/derpy_cashier"
+RELEASES_BRANCH = "releases"
 HISTORY_FILE_NAME = "releases-history.json"
 
 _CHECK_PUBLIC_FILES_SPEC = importlib.util.spec_from_file_location(
@@ -109,8 +117,9 @@ README_TEMPLATE = """# ديربي (Derby) -- نظام نقاط البيع لكا
 
 ---
 
-This repo publishes `version.json` for Derby's manual "Check for
-Updates" button, plus installer assets on GitHub Releases here.
+This branch publishes `version.json` for Derby's manual "Check for
+Updates" button -- no source code lives here. Installer assets are on
+this repo's GitHub Releases (the "الإصدار" links above).
 """
 
 
@@ -217,21 +226,78 @@ def check_preconditions(version: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def clone_or_update_working_copy() -> None:
-    if CLONE_DIR.exists():
-        result = _run(["git", "-C", str(CLONE_DIR), "checkout", "main"])
-        if result.returncode != 0:
-            raise PublishError("تعذر git checkout main في {0}".format(CLONE_DIR))
-        result = _run(["git", "-C", str(CLONE_DIR), "pull", "--ff-only", "origin", "main"])
-        if result.returncode != 0:
-            raise PublishError(
-                "تعذر تحديث النسخة المحلية من derby-releases (git pull --ff-only) في {0}".format(CLONE_DIR)
+def _clear_working_tree_except_git(directory: Path) -> None:
+    """Removes every file/folder in `directory` except .git itself --
+    used right after creating a fresh orphan branch, whose working tree
+    otherwise still holds whatever branch it was orphaned from (this repo's
+    full source code)."""
+    for item in directory.iterdir():
+        if item.name == ".git":
+            continue
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
+
+
+def _remote_has_branch(branch: str) -> bool:
+    result = _run(
+        ["git", "-C", str(CLONE_DIR), "ls-remote", "--exit-code", "--heads", "origin", branch],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def _local_has_branch(branch: str) -> bool:
+    result = _run(
+        ["git", "-C", str(CLONE_DIR), "show-ref", "--verify", "--quiet", "refs/heads/{0}".format(branch)]
+    )
+    return result.returncode == 0
+
+
+def _ensure_releases_branch_checked_out() -> None:
+    fetch_result = _run(["git", "-C", str(CLONE_DIR), "fetch", "origin"])
+    if fetch_result.returncode != 0:
+        raise PublishError("تعذر git fetch في {0}".format(CLONE_DIR))
+
+    if _local_has_branch(RELEASES_BRANCH):
+        checkout_result = _run(["git", "-C", str(CLONE_DIR), "checkout", RELEASES_BRANCH])
+        if checkout_result.returncode != 0:
+            raise PublishError("تعذر git checkout {0} في {1}".format(RELEASES_BRANCH, CLONE_DIR))
+        if _remote_has_branch(RELEASES_BRANCH):
+            pull_result = _run(
+                ["git", "-C", str(CLONE_DIR), "pull", "--ff-only", "origin", RELEASES_BRANCH]
             )
-    else:
+            if pull_result.returncode != 0:
+                raise PublishError(
+                    "تعذر تحديث فرع {0} المحلي (git pull --ff-only) في {1}".format(RELEASES_BRANCH, CLONE_DIR)
+                )
+        return
+
+    if _remote_has_branch(RELEASES_BRANCH):
+        checkout_result = _run(
+            ["git", "-C", str(CLONE_DIR), "checkout", "-b", RELEASES_BRANCH, "origin/{0}".format(RELEASES_BRANCH)]
+        )
+        if checkout_result.returncode != 0:
+            raise PublishError("تعذر checkout فرع {0} من origin في {1}".format(RELEASES_BRANCH, CLONE_DIR))
+        return
+
+    # Neither a local nor a remote "releases" branch exists yet -- create
+    # it as a fresh orphan branch (no history, no source code).
+    orphan_result = _run(["git", "-C", str(CLONE_DIR), "checkout", "--orphan", RELEASES_BRANCH])
+    if orphan_result.returncode != 0:
+        raise PublishError("تعذر إنشاء فرع {0} الجديد (orphan) في {1}".format(RELEASES_BRANCH, CLONE_DIR))
+    _clear_working_tree_except_git(CLONE_DIR)
+
+
+def clone_or_update_working_copy() -> None:
+    if not CLONE_DIR.exists():
         CLONE_DIR.parent.mkdir(parents=True, exist_ok=True)
         result = _run(["gh", "repo", "clone", REPO, str(CLONE_DIR)])
         if result.returncode != 0:
             raise PublishError("تعذر استنساخ {0} إلى {1}".format(REPO, CLONE_DIR))
+    _ensure_releases_branch_checked_out()
 
 
 def update_working_copy_files(manifest: dict) -> None:
@@ -257,8 +323,8 @@ def commit_and_push_if_needed(version: str) -> None:
     status = _run(["git", "-C", str(CLONE_DIR), "status", "--porcelain"], capture_output=True, text=True)
     if not status.stdout.strip():
         print(
-            "لا يوجد تغييرات لنشرها في derby-releases (رُفعت مسبقًا في تشغيل سابق) "
-            "-- سيُعاد فقط محاولة إنشاء GitHub Release."
+            "لا يوجد تغييرات لنشرها على فرع {0} (رُفعت مسبقًا في تشغيل سابق) "
+            "-- سيُعاد فقط محاولة إنشاء GitHub Release.".format(RELEASES_BRANCH)
         )
         return
 
@@ -272,7 +338,7 @@ def commit_and_push_if_needed(version: str) -> None:
     if commit_result.returncode != 0:
         raise PublishError("تعذر git commit في {0}".format(CLONE_DIR))
 
-    push_result = _run(["git", "-C", str(CLONE_DIR), "push", "origin", "main"])
+    push_result = _run(["git", "-C", str(CLONE_DIR), "push", "-u", "origin", RELEASES_BRANCH])
     if push_result.returncode != 0:
         raise PublishError(
             "تعذر git push -- الكوميت محفوظ محليًا في {0}, أعد تشغيل الأداة لإعادة المحاولة "
@@ -338,9 +404,13 @@ def verify_release(version: str, manifest: dict) -> None:
 
     print()
     print("تم النشر والتحقق بنجاح:")
-    print("  رابط الإصدار: {0}".format(data.get("url")))
+    print("  رابط صفحة الإصدار: {0}".format(data.get("url")))
     print("  رابط التحميل المباشر: {0}".format(manifest["download_url"]))
-    print("  رابط version.json الخام: https://raw.githubusercontent.com/{0}/main/version.json".format(REPO))
+    print(
+        "  رابط version.json الخام: https://raw.githubusercontent.com/{0}/{1}/version.json".format(
+            REPO, RELEASES_BRANCH
+        )
+    )
 
 
 def print_summary(version: str, manifest: dict) -> None:

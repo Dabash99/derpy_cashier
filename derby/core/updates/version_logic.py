@@ -10,13 +10,12 @@ from urllib.parse import urlparse
 
 ALLOWED_DOWNLOAD_HOSTS = ("github.com", "objects.githubusercontent.com", "raw.githubusercontent.com")
 
-# version.json is published to the SEPARATE public "releases" repo
-# (Dabash99/derby-releases) -- the source repo (derpy_cashier) stays
-# private because its git history contains real cafe menu photos/prices
-# (commit 00edea1, never cleaned from history -- see docs/RELEASING.md).
-# This is only the prefilled default for Settings -> update_manifest_url;
-# the owner can still edit it.
-DEFAULT_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Dabash99/derby-releases/main/version.json"
+# version.json is published on an orphan "releases" branch of this same
+# repo (Dabash99/derpy_cashier) -- that branch holds only version.json,
+# README.md and releases-history.json, never source code. This is only
+# the prefilled default for Settings -> update_manifest_url; the owner
+# can still edit it. See docs/RELEASING.md.
+DEFAULT_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Dabash99/derpy_cashier/releases/version.json"
 
 _SHA256_HEX_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
