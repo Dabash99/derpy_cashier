@@ -17,6 +17,13 @@ Windows 10 (64-bit) and follow the installer. If Windows shows a blue
 SmartScreen warning, click **"More info"** then **"Run anyway"** — this
 is normal for a new app without a paid code-signing certificate.
 
+Each release page lists a `SHA256SUMS.txt` asset alongside the
+installer — compare it against the file you downloaded if you want to
+verify it. The app's own Settings → "فحص التحديثات" button checks for
+newer releases automatically (manifest on the `releases` branch, see
+[docs/RELEASING.md](docs/RELEASING.md)); it never connects to the
+internet on its own otherwise.
+
 ## Status
 
 | Phase | What | Status |
