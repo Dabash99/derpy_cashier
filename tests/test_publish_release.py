@@ -131,21 +131,21 @@ def test_check_preconditions_rejects_missing_installer(tmp_path, monkeypatch):
     monkeypatch.setattr(publish_release, "RELEASE_DIR", release_dir)
     monkeypatch.setattr(publish_release, "PUBLIC_DIR", release_dir / "public")
 
-    with pytest.raises(publish_release.PublishError, match="المثبّت"):
+    with pytest.raises(publish_release.PublishError, match="Installer"):
         publish_release.check_preconditions("1.0.0")
 
 
 def test_check_preconditions_rejects_version_mismatch(tmp_path, monkeypatch):
     _write_release_fixture(tmp_path, monkeypatch, version="1.0.0", matching_version="0.9.9")
 
-    with pytest.raises(publish_release.PublishError, match="رقم الإصدار"):
+    with pytest.raises(publish_release.PublishError, match="version"):
         publish_release.check_preconditions("1.0.0")
 
 
 def test_check_preconditions_rejects_sha256_mismatch(tmp_path, monkeypatch):
     _write_release_fixture(tmp_path, monkeypatch, sha256="b" * 64)
 
-    with pytest.raises(publish_release.PublishError, match="SHA-256"):
+    with pytest.raises(publish_release.PublishError, match="sha256"):
         publish_release.check_preconditions("1.0.0")
 
 
@@ -154,7 +154,7 @@ def test_check_preconditions_rejects_dirty_public_folder(tmp_path, monkeypatch):
     (tmp_path / "release" / "public" / "menu.csv").write_text("x", encoding="utf-8")
     monkeypatch.setattr(publish_release, "_run", lambda *a, **k: _fake_completed(returncode=0))
 
-    with pytest.raises(publish_release.PublishError, match="الخصوصية"):
+    with pytest.raises(publish_release.PublishError, match="privacy"):
         publish_release.check_preconditions(manifest["version"])
 
 
@@ -176,7 +176,7 @@ def test_check_preconditions_rejects_when_gh_not_logged_in(tmp_path, monkeypatch
 
     monkeypatch.setattr(publish_release, "_run", fake_run)
 
-    with pytest.raises(publish_release.PublishError, match="تسجّل الدخول"):
+    with pytest.raises(publish_release.PublishError, match="logged in"):
         publish_release.check_preconditions("1.0.0")
 
 
@@ -190,7 +190,7 @@ def test_check_preconditions_refuses_to_overwrite_an_existing_tag(tmp_path, monk
 
     monkeypatch.setattr(publish_release, "_run", fake_run)
 
-    with pytest.raises(publish_release.PublishError, match="موجود بالفعل"):
+    with pytest.raises(publish_release.PublishError, match="already exists"):
         publish_release.check_preconditions("1.0.0")
 
 

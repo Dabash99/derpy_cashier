@@ -59,7 +59,7 @@ _CHECK_PUBLIC_FILES_SPEC.loader.exec_module(check_public_files)
 
 
 class PublishError(RuntimeError):
-    """Carries an Arabic, user-facing message -- never a raw traceback."""
+    """Carries a plain English, user-facing message -- never a raw traceback."""
 
 
 def _run(args, **kwargs):
@@ -162,60 +162,61 @@ def load_history(clone_dir: Path) -> List[dict]:
 
 def check_preconditions(version: str) -> dict:
     """Returns the public manifest dict on success. Raises PublishError
-    (an Arabic message, never a raw traceback) on the first failing check."""
+    (a plain English message, never a raw traceback) on the first
+    failing check."""
     installer_path = RELEASE_DIR / "Derby-Setup-{0}.exe".format(version)
     sums_path = RELEASE_DIR / "SHA256SUMS.txt"
     public_version_json_path = PUBLIC_DIR / "version.json"
 
     if not installer_path.exists():
         raise PublishError(
-            "ملف المثبّت غير موجود: {0} -- شغّل tools/make_release.py أولًا".format(installer_path)
+            "Installer file not found: {0} -- run tools/make_release.py first".format(installer_path)
         )
     if not sums_path.exists():
-        raise PublishError("release/SHA256SUMS.txt غير موجود -- شغّل tools/make_release.py أولًا")
+        raise PublishError("release/SHA256SUMS.txt not found -- run tools/make_release.py first")
     if not public_version_json_path.exists():
-        raise PublishError("release/public/version.json غير موجود -- شغّل tools/make_release.py أولًا")
+        raise PublishError("release/public/version.json not found -- run tools/make_release.py first")
 
     try:
         manifest = json.loads(public_version_json_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
-        raise PublishError("release/public/version.json ليس JSON صالحًا: {0}".format(error))
+        raise PublishError("release/public/version.json is not valid JSON: {0}".format(error))
 
     if manifest.get("version") != version:
         raise PublishError(
-            "رقم الإصدار في version.json ({0}) لا يطابق derby/__init__.py ({1}) "
-            "-- أعد تشغيل tools/make_release.py بعد رفع رقم الإصدار".format(manifest.get("version"), version)
+            "version.json's version ({0}) does not match derby/__init__.py ({1}) "
+            "-- bump the version and re-run tools/make_release.py".format(manifest.get("version"), version)
         )
 
     real_sha256 = _sha256_of(installer_path)
     if manifest.get("sha256") != real_sha256:
         raise PublishError(
-            "بصمة SHA-256 في version.json لا تطابق الملف الحقيقي -- أعد تشغيل tools/make_release.py"
+            "version.json's sha256 does not match the real installer file -- re-run tools/make_release.py"
         )
 
     problems = check_public_files.check_public_dir(PUBLIC_DIR)
     if problems:
         raise PublishError(
-            "release/public لم ينجح في فحص الخصوصية:\n  - " + "\n  - ".join(problems)
+            "release/public failed the privacy check:\n  - " + "\n  - ".join(problems)
         )
 
     gh_version = _run(["gh", "--version"], capture_output=True, text=True)
     if gh_version.returncode != 0:
         raise PublishError(
-            "أداة gh (GitHub CLI) غير مثبّتة أو لا تعمل -- نزّلها من https://cli.github.com "
-            "ثم شغّل: gh auth login"
+            "gh (GitHub CLI) is not installed or not working -- get it from https://cli.github.com "
+            "then run: gh auth login"
         )
 
     gh_auth = _run(["gh", "auth", "status"], capture_output=True, text=True)
     if gh_auth.returncode != 0:
-        raise PublishError("لم تسجّل الدخول في gh -- شغّل: gh auth login")
+        raise PublishError("Not logged in to gh -- run: gh auth login")
 
     tag = "v{0}".format(version)
     tag_check = _run(["gh", "release", "view", tag, "--repo", REPO], capture_output=True, text=True)
     if tag_check.returncode == 0:
         raise PublishError(
-            "الإصدار {0} موجود بالفعل على {1} -- رفع نفس الإصدار مرتين ممنوع، "
-            "رقّم إصدارًا جديدًا في derby/__init__.py".format(tag, REPO)
+            "Release {0} already exists on {1} -- publishing the same version twice is not allowed, "
+            "bump the version in derby/__init__.py".format(tag, REPO)
         )
 
     return manifest
@@ -259,19 +260,21 @@ def _local_has_branch(branch: str) -> bool:
 def _ensure_releases_branch_checked_out() -> None:
     fetch_result = _run(["git", "-C", str(CLONE_DIR), "fetch", "origin"])
     if fetch_result.returncode != 0:
-        raise PublishError("تعذر git fetch في {0}".format(CLONE_DIR))
+        raise PublishError("git fetch failed in {0}".format(CLONE_DIR))
 
     if _local_has_branch(RELEASES_BRANCH):
         checkout_result = _run(["git", "-C", str(CLONE_DIR), "checkout", RELEASES_BRANCH])
         if checkout_result.returncode != 0:
-            raise PublishError("تعذر git checkout {0} في {1}".format(RELEASES_BRANCH, CLONE_DIR))
+            raise PublishError("git checkout {0} failed in {1}".format(RELEASES_BRANCH, CLONE_DIR))
         if _remote_has_branch(RELEASES_BRANCH):
             pull_result = _run(
                 ["git", "-C", str(CLONE_DIR), "pull", "--ff-only", "origin", RELEASES_BRANCH]
             )
             if pull_result.returncode != 0:
                 raise PublishError(
-                    "تعذر تحديث فرع {0} المحلي (git pull --ff-only) في {1}".format(RELEASES_BRANCH, CLONE_DIR)
+                    "Failed to update the local {0} branch (git pull --ff-only) in {1}".format(
+                        RELEASES_BRANCH, CLONE_DIR
+                    )
                 )
         return
 
@@ -280,14 +283,14 @@ def _ensure_releases_branch_checked_out() -> None:
             ["git", "-C", str(CLONE_DIR), "checkout", "-b", RELEASES_BRANCH, "origin/{0}".format(RELEASES_BRANCH)]
         )
         if checkout_result.returncode != 0:
-            raise PublishError("تعذر checkout فرع {0} من origin في {1}".format(RELEASES_BRANCH, CLONE_DIR))
+            raise PublishError("Failed to check out {0} from origin in {1}".format(RELEASES_BRANCH, CLONE_DIR))
         return
 
     # Neither a local nor a remote "releases" branch exists yet -- create
     # it as a fresh orphan branch (no history, no source code).
     orphan_result = _run(["git", "-C", str(CLONE_DIR), "checkout", "--orphan", RELEASES_BRANCH])
     if orphan_result.returncode != 0:
-        raise PublishError("تعذر إنشاء فرع {0} الجديد (orphan) في {1}".format(RELEASES_BRANCH, CLONE_DIR))
+        raise PublishError("Failed to create the new (orphan) {0} branch in {1}".format(RELEASES_BRANCH, CLONE_DIR))
     _clear_working_tree_except_git(CLONE_DIR)
 
 
@@ -296,7 +299,7 @@ def clone_or_update_working_copy() -> None:
         CLONE_DIR.parent.mkdir(parents=True, exist_ok=True)
         result = _run(["gh", "repo", "clone", REPO, str(CLONE_DIR)])
         if result.returncode != 0:
-            raise PublishError("تعذر استنساخ {0} إلى {1}".format(REPO, CLONE_DIR))
+            raise PublishError("Failed to clone {0} into {1}".format(REPO, CLONE_DIR))
     _ensure_releases_branch_checked_out()
 
 
@@ -323,8 +326,8 @@ def commit_and_push_if_needed(version: str) -> None:
     status = _run(["git", "-C", str(CLONE_DIR), "status", "--porcelain"], capture_output=True, text=True)
     if not status.stdout.strip():
         print(
-            "لا يوجد تغييرات لنشرها على فرع {0} (رُفعت مسبقًا في تشغيل سابق) "
-            "-- سيُعاد فقط محاولة إنشاء GitHub Release.".format(RELEASES_BRANCH)
+            "Nothing to publish on the {0} branch (already pushed in a previous run) "
+            "-- will just retry creating the GitHub Release.".format(RELEASES_BRANCH)
         )
         return
 
@@ -332,17 +335,17 @@ def commit_and_push_if_needed(version: str) -> None:
         ["git", "-C", str(CLONE_DIR), "add", "version.json", "README.md", HISTORY_FILE_NAME]
     )
     if add_result.returncode != 0:
-        raise PublishError("تعذر git add في {0}".format(CLONE_DIR))
+        raise PublishError("git add failed in {0}".format(CLONE_DIR))
 
     commit_result = _run(["git", "-C", str(CLONE_DIR), "commit", "-m", "Release {0}".format(version)])
     if commit_result.returncode != 0:
-        raise PublishError("تعذر git commit في {0}".format(CLONE_DIR))
+        raise PublishError("git commit failed in {0}".format(CLONE_DIR))
 
     push_result = _run(["git", "-C", str(CLONE_DIR), "push", "-u", "origin", RELEASES_BRANCH])
     if push_result.returncode != 0:
         raise PublishError(
-            "تعذر git push -- الكوميت محفوظ محليًا في {0}, أعد تشغيل الأداة لإعادة المحاولة "
-            "(لن يتكرر الكوميت)".format(CLONE_DIR)
+            "git push failed -- the commit is saved locally in {0}; re-run this tool to retry "
+            "(the commit will not be duplicated)".format(CLONE_DIR)
         )
 
 
@@ -373,8 +376,8 @@ def create_github_release(version: str, manifest: dict) -> None:
         notes_path.unlink(missing_ok=True)
     if result.returncode != 0:
         raise PublishError(
-            "تم رفع version.json/README لكن إنشاء GitHub Release ({0}) فشل -- "
-            "أعد تشغيل الأداة فقط (لن يتكرر الكوميت أو الدفع) لإعادة محاولة إنشاء الإصدار".format(tag)
+            "version.json/README were pushed but creating the GitHub Release ({0}) failed -- "
+            "just re-run this tool (the commit/push will not repeat) to retry creating the release".format(tag)
         )
 
 
@@ -386,7 +389,7 @@ def verify_release(version: str, manifest: dict) -> None:
         text=True,
     )
     if result.returncode != 0:
-        raise PublishError("تم إنشاء الإصدار لكن تعذّر التحقق منه بعد ذلك -- راجعه يدويًا على GitHub")
+        raise PublishError("The release was created but could not be verified afterward -- check it on GitHub")
 
     data = json.loads(result.stdout)
     remote_sizes = {asset["name"]: asset["size"] for asset in data.get("assets", [])}
@@ -397,17 +400,17 @@ def verify_release(version: str, manifest: dict) -> None:
         remote_size = remote_sizes.get(local_path.name)
         if remote_size != local_path.stat().st_size:
             raise PublishError(
-                "حجم {0} على GitHub ({1}) لا يطابق الملف المحلي ({2})".format(
+                "{0}'s size on GitHub ({1}) does not match the local file ({2})".format(
                     local_path.name, remote_size, local_path.stat().st_size
                 )
             )
 
     print()
-    print("تم النشر والتحقق بنجاح:")
-    print("  رابط صفحة الإصدار: {0}".format(data.get("url")))
-    print("  رابط التحميل المباشر: {0}".format(manifest["download_url"]))
+    print("Published and verified successfully:")
+    print("  Release page: {0}".format(data.get("url")))
+    print("  Direct download link: {0}".format(manifest["download_url"]))
     print(
-        "  رابط version.json الخام: https://raw.githubusercontent.com/{0}/{1}/version.json".format(
+        "  Raw version.json URL: https://raw.githubusercontent.com/{0}/{1}/version.json".format(
             REPO, RELEASES_BRANCH
         )
     )
@@ -416,7 +419,7 @@ def verify_release(version: str, manifest: dict) -> None:
 def print_summary(version: str, manifest: dict) -> None:
     installer_path = RELEASE_DIR / "Derby-Setup-{0}.exe".format(version)
     sums_path = RELEASE_DIR / "SHA256SUMS.txt"
-    print("سيتم نشر الإصدار {0} على {1}:".format(version, REPO))
+    print("About to publish version {0} to {1}:".format(version, REPO))
     print("  {0} ({1:.1f} MB)".format(installer_path.name, installer_path.stat().st_size / (1024 * 1024)))
     print("  {0}".format(sums_path.name))
     print("  sha256: {0}".format(manifest["sha256"]))
@@ -443,13 +446,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.dry_run:
         print()
-        print("--dry-run: لم يتم تنفيذ أي شيء فعليًا (لا clone، لا commit، لا push، لا GitHub Release).")
+        print("--dry-run: nothing was actually done (no clone, no commit, no push, no GitHub Release).")
         return 0
 
     if not args.yes:
-        answer = input("أكّد نشر هذا الإصدار على {0}؟ (اكتب yes للتأكيد): ".format(REPO))
+        answer = input("Confirm publishing this version to {0}? (type yes to confirm): ".format(REPO))
         if answer.strip().lower() != "yes":
-            print("تم الإلغاء -- لم يتم نشر أي شيء.")
+            print("Cancelled -- nothing was published.")
             return 1
 
     try:
