@@ -11,10 +11,13 @@ local clone of the public repo Dabash99/derby-releases. This script:
 
   - NEVER touches git (no branch, no worktree, no commit) in this repo
     or anywhere else.
-  - NEVER pushes, tags, or creates a GitHub release.
-  - NEVER makes a network request (the app's own update_check.py is the
-    only networking code in the whole project, and it is not exercised
-    by this script).
+  - NEVER pushes, tags, or creates a GitHub release -- UNLESS --publish
+    is passed explicitly, in which case it hands off to
+    tools/publish_release.py (git/gh via subprocess only, no Python
+    networking) at the very end, after everything else below succeeds.
+  - Without --publish, NEVER makes a network request (the app's own
+    update_check.py is the only networking code in the whole project,
+    and it is not exercised by this script).
   - Stops loudly (non-zero exit, clear message) on the first failing
     step -- a half-finished release is never silently reported as OK.
 
@@ -29,13 +32,17 @@ Steps:
   6. release\\public\\version.json + release\\public\\README.md -- the
      only two files meant to be copied into derby-releases.
   7. tools/check_public_files.py against release\\public\\.
-  8. Prints the exact manual copy/push steps (never run automatically).
+  8. Prints the exact manual copy/push steps -- or, with --publish, runs
+     tools/publish_release.py to do them (still asks to confirm unless
+     --yes is also passed).
 
 Usage:
     .venv\\Scripts\\python.exe tools\\make_release.py
+    .venv\\Scripts\\python.exe tools\\make_release.py --publish
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import subprocess
 import sys
@@ -179,9 +186,30 @@ def print_manual_steps(version: str) -> None:
     print()
     print("Reminder: derpy_cashier (this repo) must stay PRIVATE -- its git history still")
     print("contains real cafe menu photos/prices (commit 00edea1).")
+    print()
+    print("Or, next time, pass --publish to run tools/publish_release.py automatically")
+    print("once this build finishes (it will still ask to confirm unless you also pass --yes).")
 
 
-def main() -> int:
+def run_publish(extra_args) -> int:
+    result = _run([PYTHON, str(PROJECT_ROOT / "tools" / "publish_release.py")] + list(extra_args))
+    return result.returncode
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="after a successful build, also run tools/publish_release.py (default: never publish)",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="with --publish, skip publish_release.py's confirmation prompt",
+    )
+    args = parser.parse_args(argv)
+
     import derby
 
     run_quality_gates()
@@ -191,6 +219,12 @@ def main() -> int:
     write_public_files(manifest)
     run_public_files_check()
     print_manual_steps(derby.__version__)
+
+    if args.publish:
+        publish_args = ["--yes"] if args.yes else []
+        returncode = run_publish(publish_args)
+        if returncode != 0:
+            _abort("tools/publish_release.py failed -- see its output above")
     return 0
 
 

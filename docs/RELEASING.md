@@ -62,9 +62,62 @@
 
 هذا السكربت **لا يلمس git أبدًا** (لا فرع، لا worktree، لا commit)، ولا
 يرفع (`push`) ولا ينشئ Tag أو GitHub Release، ولا يتصل بالإنترنت في أي
-لحظة. أنت من يقوم بهذه الخطوات بعد مراجعة التقرير.
+لحظة، **إلا لو مررت `--publish`** (التفصيل في القسم 3 تحت) — بدونها
+يطبع فقط خطوات النسخ/الرفع اليدوية.
 
-## 3. الخطوات اليدوية بعد نجاح `make_release.py`
+## 3. النشر: تلقائي (`tools/publish_release.py`) أو يدوي
+
+### الطريقة الأسهل: أمر واحد من البداية للنهاية
+
+```bash
+.venv\Scripts\python.exe tools\make_release.py --publish
+```
+
+هذا يشغّل كل خطوات القسم 2 ثم، لو نجحت، يشغّل `tools/publish_release.py`
+تلقائيًا (ويسألك تأكيد قبل النشر الفعلي، إلا لو ضفت `--yes` كمان).
+
+### أو تشغيل النشر بمفرده بعد `make_release.py` عادي
+
+```bash
+.venv\Scripts\python.exe tools\publish_release.py
+```
+
+يستخدم فقط أوامر `git` و `gh` (GitHub CLI) عبر subprocess — **لا يستورد
+أي مكتبة شبكة بايثون**، نفس روح قاعدة "بدون شبكة" في CLAUDE.md، لكنه
+أداة تطوير صريحة يشغّلها المالك بنفسه وليست جزءًا من البرنامج المُجمَّع.
+
+قبل أي شيء يتحقق من (برسالة عربية واضحة ويتوقف لو فشل أي شرط):
+- وجود `release\Derby-Setup-<ver>.exe` و `release\SHA256SUMS.txt` و
+  `release\public\version.json`
+- أن `version.json` يطابق رقم الإصدار الحقيقي وبصمة SHA-256 الحقيقية
+  للملف
+- نجاح `tools/check_public_files.py`
+- أن `gh --version` يعمل و `gh auth status` مسجّل دخول (لو `gh` غير
+  مثبّت: يطلب منك تثبيته من https://cli.github.com ثم `gh auth login` —
+  لا يحاول تثبيت أي شيء بنفسه)
+- أن الإصدار (tag) `v<ver>` **غير موجود بالفعل** على `derby-releases` —
+  يرفض رفع نفس الإصدار مرتين ويطلب ترقيم إصدار جديد
+
+ثم يطبع ملخص (الإصدار، أسماء الملفات وأحجامها، البصمة، المستودع
+المستهدف) ويطلب تأكيدًا (إلا مع `--yes`)، أو يطبع الملخص فقط ويتوقف مع
+`--dry-run` بدون أي تنفيذ فعلي.
+
+بعد التأكيد: يستنسخ (أو يحدّث) نسخة محلية من `derby-releases` تحت
+`build\derby-releases` (لا يلمس أبدًا حالة git لمستودع ديربي نفسه)،
+يحدّث فيها `version.json` و `README.md` (رابط تحميل مباشر بارز، البصمة،
+متطلبات Windows 7 SP1/10 64-bit، ملاحظة عن تحذير SmartScreen "More
+info → Run anyway"، وجدول كل الإصدارات السابقة مُولَّد من
+`releases-history.json` وليس معدَّلًا باليد) و `releases-history.json`،
+يعمل commit + push (أو يتخطى هذا لو لم يتغيّر شيء — مثلًا لو تشغيل سابق
+رفع لكن فشل في إنشاء GitHub Release، فإعادة التشغيل تكمل من حيث توقفت
+بدون تكرار الكوميت)، ثم `gh release create` مع المثبّت و
+`SHA256SUMS.txt`، ثم يتحقق أن حجم الملفين على GitHub يطابق الملفين
+المحليين ويطبع الروابط النهائية.
+
+لو فشلت خطوة إنشاء GitHub Release بعد نجاح الرفع (push)، الرسالة توضّح
+ذلك بالضبط وتطلب فقط إعادة تشغيل الأداة — لن يتكرر الكوميت أو الدفع.
+
+### الطريقة اليدوية البديلة (بدون `gh` أو بدون تشغيل الأداة)
 
 1. افتح نسخة محلية (`git clone`) من `Dabash99/derby-releases` على جهازك،
    وانسخ لها:
@@ -145,11 +198,20 @@ full silent install/`--selftest`/uninstall verification cycle, entirely
 in temp directories), computes the installer's real SHA-256, writes
 `release/version.json`, and writes the public-safe copy to
 `release/public/` (checked by `tools/check_public_files.py` for stray
-personal data). It never touches git, never pushes, never creates a
-release, and never makes a network request -- copying
-`release/public/*` into a local `derby-releases` clone, committing,
-pushing, and creating the GitHub Release are manual steps printed at
-the end (and repeated in section 3 above).
+personal data). By itself it never touches git, never pushes, never
+creates a release, and never makes a network request -- it just prints
+the manual copy/push/release steps. Pass `--publish` (and optionally
+`--yes`) to also run `tools/publish_release.py` at the end.
+
+`tools/publish_release.py` is the automated publish step: git/gh only
+via subprocess (no Python networking library), with strict
+preconditions (files present, version/sha256 match, `check_public_files`
+passes, `gh` installed and logged in, target tag doesn't already
+exist), a confirmation prompt (or `--dry-run`/`--yes`), and an
+idempotent clone-update-commit-push-release-verify sequence under
+`build/derby-releases` -- a retry after a partial failure (e.g. the
+push succeeded but `gh release create` didn't) never duplicates the
+commit or the release.
 
 Settings -> `update_manifest_url` is prefilled by default with
 `https://raw.githubusercontent.com/Dabash99/derby-releases/main/version.json`

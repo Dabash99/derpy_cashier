@@ -137,7 +137,12 @@ This file covers engineering rules and conventions.
                          quality gates + build + installer + version.json
                          + release/public/, see docs/RELEASING.md),
                          check_public_files.py (privacy guard for
-                         release/public/, also called by make_release.py)
+                         release/public/, also called by make_release.py),
+                         publish_release.py (git/gh only, no Python
+                         networking -- pushes release/public/* to the
+                         separate public repo Dabash99/derby-releases
+                         and creates the GitHub Release; run explicitly
+                         by the owner, or via make_release.py --publish)
                          (may import QtSvg; never shipped/frozen)
   installer/             derby.iss (Inno Setup) + version.iss (generated) + redist/
   derby.spec              PyInstaller spec (one-dir, see tools/build.py)
