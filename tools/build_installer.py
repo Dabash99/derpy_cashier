@@ -33,6 +33,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -128,7 +129,17 @@ def verify_installer(installer_path: Path) -> None:
         print("ABORTED: silent uninstall failed (exit {0})".format(result.returncode))
         sys.exit(1)
 
-    remaining = [p for p in install_dir.rglob("*") if p.is_file() and p.name != "unins000.dat"]
+    # unins000.exe deletes ITSELF asynchronously: it spawns a copy of
+    # itself elsewhere that removes the original a moment after this
+    # process (which we've already waited for above) exits -- so the
+    # file can still legitimately be on disk for a brief window here.
+    # Poll for up to a few seconds before treating it as a real leftover.
+    remaining = []
+    for _ in range(20):
+        remaining = [p for p in install_dir.rglob("*") if p.is_file() and p.name != "unins000.dat"]
+        if not remaining:
+            break
+        time.sleep(0.25)
     if remaining:
         print("ABORTED: files remain in {0} after uninstall: {1}".format(install_dir, remaining))
         sys.exit(1)

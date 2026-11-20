@@ -1,6 +1,8 @@
 """Sanity checks for the generated installer wizard images and for
-installer/derby.iss's content (not a compile -- that needs Inno Setup
-6, which this environment does not have; see tools/build_installer.py).
+installer/derby.iss's content (not a compile -- a real compile needs
+Inno Setup 6 installed, which not every dev/CI machine has; see
+tools/build_installer.py for that, run manually or via
+tools/make_release.py).
 If the image checks fail, re-run:
     .venv\\Scripts\\python.exe tools\\make_installer_images.py
 """
@@ -34,9 +36,14 @@ def test_wizard_small_image_is_55x55_bmp():
 
 def test_derby_iss_exists_and_has_required_directives():
     text = (INSTALLER_DIR / "derby.iss").read_text(encoding="utf-8")
-    assert "ArchitecturesAllowed=x64" in text
+    assert "ArchitecturesAllowed=x64compatible" in text
     assert "MinVersion=6.1sp1" in text
-    assert "AppId={#MyAppId}" in text
+    # The leading "{" is deliberately doubled ("{{") -- {#MyAppId} already
+    # expands to a brace-enclosed GUID, and Inno Setup's runtime constant
+    # parser needs that escape or it tries (and fails) to look up
+    # "<guid>" as a named constant. See the comment above this line in
+    # installer/derby.iss and docs/RELEASING.md.
+    assert "AppId={{#MyAppId}" in text
     assert "WizardImageFile=wizard-image.bmp" in text
     assert "WizardSmallImageFile=wizard-small-image.bmp" in text
     assert "SetupIconFile=..\\assets\\derby.ico" in text

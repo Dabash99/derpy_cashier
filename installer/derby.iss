@@ -22,15 +22,23 @@
 #define MyAppId "{83A362E7-54D0-4B04-88A5-DB9E45992C5A}"
 
 [Setup]
-AppId={#MyAppId}
+; {#MyAppId} already includes its own enclosing braces (it's the GUID
+; literal "{83A362E7-...}") -- the runtime constant parser needs the
+; leading "{" doubled ("{{") to treat it as a literal brace rather than
+; the start of an (unknown) named constant. See docs/RELEASING.md.
+AppId={{#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\Derby
 DefaultGroupName=Derby
 DisableProgramGroupPage=yes
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+; "x64compatible" (Inno Setup 6.3+) is the recommended identifier over
+; the deprecated "x64" -- matches real x64 Windows (7 SP1, 10) without
+; pulling in ARM64's x64 emulation layer, which this project doesn't
+; target or test.
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=6.1sp1
 OutputDir=..\release
 OutputBaseFilename=Derby-Setup-{#MyAppVersion}
@@ -67,7 +75,10 @@ en.MissingVCRedist=برنامج ديربي يحتاج إلى Microsoft Visual C+
 en.MissingUCRT=هذا جهاز يعمل بنظام Windows 7، ويبدو أن تحديث Universal C Runtime (KB2999226) غير مثبّت -- برنامج ديربي لن يعمل بدونه. من فضلك ثبّت KB2999226 (أو تحديث تراكمي أحدث يتضمنه) من Windows Update، ثم أعد تشغيل هذا المثبت.
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checked
+; Tasks are checked by default unless "unchecked" is given -- there is
+; no "checked" flag (an earlier version of this line used one, which
+; Inno Setup 6.7.4's compiler rejects as an unknown Tasks flag).
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
 Source: "..\dist\Derby\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -121,14 +132,18 @@ procedure TryInstallBundledVCRedist();
 var
   ResultCode: Integer;
 begin
-  if ExtractTemporaryFile('vc_redist.x64.exe') then
-  begin
-    if not Exec(ExpandConstant('{tmp}\vc_redist.x64.exe'), '/install /quiet /norestart', '', SW_SHOW,
-      ewWaitUntilTerminated, ResultCode) then
-    begin
-      { Exec itself failed to launch it -- fall through to the manual message below. }
-    end;
+  { ExtractTemporaryFile is a procedure (no return value) -- it raises an
+    exception on failure rather than returning False, so this is wrapped
+    in try/except and the file's actual presence is checked afterward. }
+  try
+    ExtractTemporaryFile('vc_redist.x64.exe');
+  except
+    { Fall through to the manual message below. }
   end;
+
+  if FileExists(ExpandConstant('{tmp}\vc_redist.x64.exe')) then
+    Exec(ExpandConstant('{tmp}\vc_redist.x64.exe'), '/install /quiet /norestart', '', SW_SHOW,
+      ewWaitUntilTerminated, ResultCode);
 end;
 
 function InitializeSetup(): Boolean;
