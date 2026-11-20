@@ -36,7 +36,7 @@ from derby.core.db import (
     settings_repo,
 )
 from derby.core.utils.business_date import business_date as compute_business_date
-from derby.core.utils.time_utils import utc_now
+from derby.core.utils.time_utils import parse_utc_iso, to_cairo, utc_now
 from derby.features.pos.orders_service import is_from_previous_business_day
 
 PAYMENT_METHODS = ("cash", "instapay")
@@ -211,6 +211,23 @@ def _build_per_day(start_date: date, end_date: date, paid_orders, expense_rows) 
             )
         )
     return per_day
+
+
+def sales_by_hour(conn: sqlite3.Connection, business_date: date) -> List[int]:
+    """Net sales (paid orders only) bucketed by the LOCAL (Cairo) hour
+    they were paid in, for ONE business date -- 24 buckets, index 0..23.
+    Reuses the same paid-orders query build_report() uses; this is a new
+    grouping of it (by hour instead of by day), not a second copy of the
+    sales math itself."""
+    iso = business_date.isoformat()
+    paid_orders = reports_repo.list_paid_orders_in_range(conn, iso, iso)
+    buckets = [0] * 24
+    for order in paid_orders:
+        if not order["paid_at_utc"]:
+            continue
+        hour = to_cairo(parse_utc_iso(order["paid_at_utc"])).hour
+        buckets[hour] += order["total_piasters"]
+    return buckets
 
 
 def build_report(

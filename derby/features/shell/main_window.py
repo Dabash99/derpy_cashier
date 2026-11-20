@@ -13,6 +13,7 @@ from derby.core.db import settings_repo
 from derby.core.i18n import ar
 from derby.features.auth import permissions
 from derby.features.closing.closing_banner import ClosingBannerWidget
+from derby.features.dashboard.daily_stats_screen import DailyStatsScreen
 from derby.features.expenses.expenses_screen import ExpensesScreen
 from derby.features.menu.menu_screen import MenuScreen
 from derby.features.playstation.playstation_screen import PlaystationScreen
@@ -104,6 +105,8 @@ class MainWindow(QMainWindow):
                 widget = SalesLogScreen(self._conn, self._user)
             elif key == "playstation":
                 widget = PlaystationScreen(self._conn, self._user)
+            elif key == "daily_stats":
+                widget = DailyStatsScreen(self._conn, self._user)
             elif key == "expenses":
                 widget = ExpensesScreen(self._conn, self._user)
             elif key == "supplies":
@@ -121,6 +124,7 @@ class MainWindow(QMainWindow):
             if tables_screen is not None:
                 tables_screen.order_opened.connect(self._on_order_opened_from_tables)
                 tables_screen.table_selected.connect(self._on_table_selected_from_tables)
+                tables_screen.takeaway_requested.connect(self._on_takeaway_requested_from_tables)
             playstation_screen = self._screens.get("playstation")
             if playstation_screen is not None:
                 playstation_screen.order_opened.connect(self._on_order_opened_from_tables)
@@ -139,6 +143,12 @@ class MainWindow(QMainWindow):
         pos_screen = self._screens.get("pos")
         if pos_screen is not None:
             pos_screen.open_table(table_id)
+            self._on_navigate("pos")
+
+    def _on_takeaway_requested_from_tables(self, label: str) -> None:
+        pos_screen = self._screens.get("pos")
+        if pos_screen is not None:
+            pos_screen.start_takeaway_pending(label)
             self._on_navigate("pos")
 
     def _on_navigate(self, key: str) -> None:

@@ -15,12 +15,20 @@ _TARGET_ROLE = 1000
 
 
 class MoveOrderDialog(QDialog):
-    def __init__(self, conn: sqlite3.Connection, order_id: int, requesting_user: sqlite3.Row, parent=None) -> None:
+    def __init__(
+        self,
+        conn: sqlite3.Connection,
+        order_id: int,
+        requesting_user: sqlite3.Row,
+        parent=None,
+        allowed_kinds=("table", "device"),
+    ) -> None:
         super().__init__(parent)
         self._conn = conn
         self._order_id = order_id
         self._requesting_user = requesting_user
-        self.setWindowTitle(ar.TABLES_MOVE_ORDER_TITLE)
+        self._allowed_kinds = allowed_kinds
+        self.setWindowTitle(ar.TABLES_MOVE_TO_TABLE_TITLE if allowed_kinds == ("table",) else ar.TABLES_MOVE_ORDER_TITLE)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -29,22 +37,24 @@ class MoveOrderDialog(QDialog):
 
         self._list = QListWidget()
         order = orders_repo.get_order(self._conn, self._order_id)
-        for table in tables_repo.list_tables(self._conn, active_only=True):
-            if table["id"] == order["table_id"]:
-                continue
-            if orders_repo.get_open_order_for_table(self._conn, table["id"]) is not None:
-                continue
-            item = QListWidgetItem(table["name"])
-            item.setData(_TARGET_ROLE, ("table", table["id"]))
-            self._list.addItem(item)
-        for device in ps_devices_repo.list_devices(self._conn, active_only=True):
-            if device["id"] == order["device_id"]:
-                continue
-            if orders_repo.get_open_order_for_device(self._conn, device["id"]) is not None:
-                continue
-            item = QListWidgetItem("{0} ({1})".format(device["name"], ar.SIDEBAR_PLAYSTATION))
-            item.setData(_TARGET_ROLE, ("device", device["id"]))
-            self._list.addItem(item)
+        if "table" in self._allowed_kinds:
+            for table in tables_repo.list_tables(self._conn, active_only=True):
+                if table["id"] == order["table_id"]:
+                    continue
+                if orders_repo.get_open_order_for_table(self._conn, table["id"]) is not None:
+                    continue
+                item = QListWidgetItem(table["name"])
+                item.setData(_TARGET_ROLE, ("table", table["id"]))
+                self._list.addItem(item)
+        if "device" in self._allowed_kinds:
+            for device in ps_devices_repo.list_devices(self._conn, active_only=True):
+                if device["id"] == order["device_id"]:
+                    continue
+                if orders_repo.get_open_order_for_device(self._conn, device["id"]) is not None:
+                    continue
+                item = QListWidgetItem("{0} ({1})".format(device["name"], ar.SIDEBAR_PLAYSTATION))
+                item.setData(_TARGET_ROLE, ("device", device["id"]))
+                self._list.addItem(item)
         layout.addWidget(self._list)
 
         self._error_label = QLabel("")

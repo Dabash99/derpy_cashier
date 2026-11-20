@@ -22,6 +22,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import products_repo
 from derby.core.i18n import ar
+from derby.core.theme.tab_bar import configure_tab_widget
 from derby.features.menu.addon_groups_panel import AddonGroupsPanel
 from derby.features.menu.arabic_search import filter_products_by_search
 from derby.features.menu.categories_panel import CategoriesPanel
@@ -47,6 +48,7 @@ class MenuScreen(QWidget):
         layout.addWidget(title)
 
         tabs = QTabWidget()
+        configure_tab_widget(tabs)
         tabs.addTab(self._build_products_tab(), ar.MENU_TAB_PRODUCTS)
         self._addon_groups_panel = AddonGroupsPanel(self._conn)
         tabs.addTab(self._addon_groups_panel, ar.MENU_TAB_ADDONS)

@@ -21,18 +21,25 @@ def create_order(
     table_id: Optional[int],
     opened_by: int,
     device_id: Optional[int] = None,
+    label: Optional[str] = None,
     commit: bool = True,
 ) -> int:
     cursor = conn.execute(
         """
-        INSERT INTO orders (table_id, device_id, status, opened_at_utc, opened_by, subtotal_piasters, discount_piasters, total_piasters)
-        VALUES (?, ?, 'open', ?, ?, 0, 0, 0)
+        INSERT INTO orders (table_id, device_id, status, opened_at_utc, opened_by, subtotal_piasters, discount_piasters, total_piasters, label)
+        VALUES (?, ?, 'open', ?, ?, 0, 0, 0, ?)
         """,
-        (table_id, device_id, to_utc_iso(utc_now()), opened_by),
+        (table_id, device_id, to_utc_iso(utc_now()), opened_by, label),
     )
     if commit:
         conn.commit()
     return cursor.lastrowid
+
+
+def set_label(conn: sqlite3.Connection, order_id: int, label: Optional[str], commit: bool = True) -> None:
+    conn.execute("UPDATE orders SET label = ? WHERE id = ?", (label, order_id))
+    if commit:
+        conn.commit()
 
 
 def get_order(conn: sqlite3.Connection, order_id: int) -> Optional[sqlite3.Row]:

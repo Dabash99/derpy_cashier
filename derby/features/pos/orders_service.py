@@ -93,10 +93,10 @@ def auto_cancel_empty_open_orders(conn: sqlite3.Connection, actor_user_id: Optio
     return cancelled
 
 
-def create_takeaway_order(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row:
+def create_takeaway_order(conn: sqlite3.Connection, user_id: int, label: Optional[str] = None) -> sqlite3.Row:
     # Takeaway orders are never shared/reused -- every "new takeaway" click
     # starts a fresh one, unlike a table which reopens its existing order.
-    order_id = orders_repo.create_order(conn, None, user_id)
+    order_id = orders_repo.create_order(conn, None, user_id, label=(label or "").strip() or None)
     return orders_repo.get_order(conn, order_id)
 
 

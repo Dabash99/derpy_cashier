@@ -19,15 +19,14 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
-from derby.core.db import addons_repo, orders_repo, products_repo, ps_devices_repo, tables_repo, users_repo
+from derby.core.db import addons_repo, orders_repo, products_repo, ps_devices_repo, tables_repo
 from derby.core.i18n import ar
 from derby.features.pos import orders_service
 from derby.features.pos.addon_dialog import AddonDialog
+from derby.features.pos.cancel_order_ui import confirm_and_cancel_order
 from derby.features.pos.cart_panel import CartPanel
 from derby.features.pos.discount_dialog import DiscountDialog
-from derby.features.pos.exceptions import ApprovalLockedOutError, WrongApprovalPinError
 from derby.features.pos.invoice_dialog import print_invoice
-from derby.features.pos.owner_pin_prompt import ask_for_owner_pin
 from derby.features.pos.payment_dialog import PaymentDialog
 from derby.features.pos.product_grid import ProductGrid
 
@@ -42,6 +41,7 @@ class PosScreen(QWidget):
         # order row yet -- see _materialize_pending_order().
         self._pending_table_id = None
         self._pending_is_takeaway = False
+        self._pending_label = None
 
         self._stack = QStackedWidget()
         outer = QVBoxLayout(self)
@@ -66,7 +66,7 @@ class PosScreen(QWidget):
         layout.addLayout(self._chooser_grid)
 
         takeaway_button = QPushButton(ar.POS_TAKEAWAY_BUTTON)
-        takeaway_button.clicked.connect(self._on_start_takeaway)
+        takeaway_button.clicked.connect(lambda: self.start_takeaway_pending(None))
         layout.addWidget(takeaway_button)
 
         layout.addStretch(1)
@@ -104,6 +104,7 @@ class PosScreen(QWidget):
         self._current_order_id = None
         self._pending_table_id = table_id
         self._pending_is_takeaway = False
+        self._pending_label = None
         self._order_label.setText(table["name"] if table is not None else "")
         self._cart_panel.set_order(None)
         self._stack.setCurrentWidget(self._working_page)
@@ -111,11 +112,15 @@ class PosScreen(QWidget):
     def _on_start_table(self, table_id: int) -> None:
         self.open_table(table_id)
 
-    def _on_start_takeaway(self) -> None:
+    def start_takeaway_pending(self, label: Optional[str] = None) -> None:
+        """Entry point for both the chooser page's own button and the
+        Tables screen's "+ طلب تيك أواي" -- opens an EMPTY draft with no
+        order row yet (lazy creation, same rule as a free table)."""
         self._current_order_id = None
         self._pending_table_id = None
         self._pending_is_takeaway = True
-        self._order_label.setText(ar.TABLES_TAKEAWAY_SECTION)
+        self._pending_label = (label or "").strip() or None
+        self._order_label.setText(self._pending_label or ar.TABLES_TAKEAWAY_SECTION)
         self._cart_panel.set_order(None)
         self._stack.setCurrentWidget(self._working_page)
 
@@ -126,7 +131,7 @@ class PosScreen(QWidget):
         if self._current_order_id is not None:
             return self._current_order_id
         if self._pending_is_takeaway:
-            order = orders_service.create_takeaway_order(self._conn, self._user["id"])
+            order = orders_service.create_takeaway_order(self._conn, self._user["id"], label=self._pending_label)
         elif self._pending_table_id is not None:
             order = orders_service.get_or_create_table_order(self._conn, self._pending_table_id, self._user["id"])
         else:
@@ -134,6 +139,7 @@ class PosScreen(QWidget):
         self._current_order_id = order["id"]
         self._pending_table_id = None
         self._pending_is_takeaway = False
+        self._pending_label = None
         self._cart_panel.set_order(self._current_order_id)
         return self._current_order_id
 
@@ -185,6 +191,7 @@ class PosScreen(QWidget):
         self._current_order_id = order_id
         self._pending_table_id = None
         self._pending_is_takeaway = False
+        self._pending_label = None
         order = orders_repo.get_order(self._conn, order_id)
         if order["table_id"]:
             table = tables_repo.get_table(self._conn, order["table_id"])
@@ -193,7 +200,7 @@ class PosScreen(QWidget):
             device = ps_devices_repo.get_device(self._conn, order["device_id"])
             self._order_label.setText(device["name"] if device is not None else "")
         else:
-            self._order_label.setText(ar.TABLES_TAKEAWAY_SECTION)
+            self._order_label.setText(order["label"] or ar.TABLES_TAKEAWAY_SECTION)
         self._cart_panel.set_order(order_id)
         self._stack.setCurrentWidget(self._working_page)
 
@@ -204,6 +211,7 @@ class PosScreen(QWidget):
         self._current_order_id = None
         self._pending_table_id = None
         self._pending_is_takeaway = False
+        self._pending_label = None
         orders_service.auto_cancel_empty_open_orders(self._conn, self._user["id"])
 
     def _on_back_to_chooser(self) -> None:
@@ -256,23 +264,5 @@ class PosScreen(QWidget):
             # nothing in the database to cancel or approve.
             self._on_back_to_chooser()
             return
-        confirmed = QMessageBox.question(self, ar.POS_CANCEL_CONFIRM_TITLE, ar.POS_CANCEL_CONFIRM_MESSAGE)
-        if confirmed != QMessageBox.Yes:
-            return
-
-        has_items = len(orders_repo.list_order_items(self._conn, self._current_order_id)) > 0
-        approving_pin = None
-        if has_items and self._user["role"] != users_repo.ROLE_OWNER:
-            approving_pin = ask_for_owner_pin(self)
-            if approving_pin is None:
-                return
-
-        try:
-            orders_service.cancel(self._conn, self._current_order_id, self._user, approving_pin=approving_pin)
-        except WrongApprovalPinError:
-            QMessageBox.warning(self, ar.GENERIC_ERROR_TITLE, ar.DISCOUNT_ERROR_WRONG_PIN)
-            return
-        except ApprovalLockedOutError:
-            QMessageBox.warning(self, ar.GENERIC_ERROR_TITLE, ar.LOGIN_ERROR_LOCKED.format(minutes=0, seconds=0))
-            return
-        self._on_back_to_chooser()
+        if confirm_and_cancel_order(self, self._conn, self._current_order_id, self._user):
+            self._on_back_to_chooser()

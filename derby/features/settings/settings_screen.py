@@ -9,6 +9,7 @@ from pathlib import Path
 from PySide2.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
 
 from derby.core.i18n import ar
+from derby.core.theme.tab_bar import configure_tab_widget
 from derby.features.closing.backup_closing_panel import BackupClosingPanel
 from derby.features.settings.about_panel import AboutPanel
 from derby.features.settings.advanced_tools_panel import AdvancedToolsPanel
@@ -27,6 +28,7 @@ class SettingsScreen(QWidget):
         layout.addWidget(title)
 
         tabs = QTabWidget()
+        configure_tab_widget(tabs)
         self._general_form = GeneralSettingsForm(conn)
         self._users_widget = UsersManagementWidget(conn, user["id"])
         self._update_panel = UpdateCheckPanel(conn)

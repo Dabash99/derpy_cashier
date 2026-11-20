@@ -36,6 +36,7 @@ from derby.core.i18n import ar
 from derby.core.theme import icons
 from derby.core.theme.stat_tile import StatTile
 from derby.core.theme.styled import enable_styled_background
+from derby.core.theme.tab_bar import configure_tab_widget
 from derby.core.theme.table_style import centered_item, configure_table, fit_table_height, right_item
 from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import to_cairo, utc_now
@@ -92,6 +93,7 @@ class ReportsScreen(QWidget):
         outer.addWidget(title)
 
         self._tabs = QTabWidget()
+        configure_tab_widget(self._tabs)
         self._tabs.addTab(self._build_daily_tab(), ar.REPORTS_TAB_DAILY)
         self._tabs.addTab(self._build_monthly_tab(), ar.REPORTS_TAB_MONTHLY)
         self._tabs.addTab(self._build_custom_tab(), ar.REPORTS_TAB_CUSTOM)

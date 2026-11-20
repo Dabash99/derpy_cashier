@@ -457,6 +457,14 @@ def _migration_0007_supplies(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_supplies_status_priority ON supplies (status, priority)")
 
 
+def _migration_0008_order_label(conn: sqlite3.Connection) -> None:
+    # Optional short free-text label for a takeaway order (e.g. a
+    # customer name/note) -- shown on its card, the cashier header, the
+    # sales log, and the invoice. Never required, never touches
+    # numbering/invoice rules.
+    conn.execute("ALTER TABLE orders ADD COLUMN label TEXT")
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
@@ -465,6 +473,7 @@ MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0005_expenses,
     _migration_0006_closing,
     _migration_0007_supplies,
+    _migration_0008_order_label,
 ]
 
 

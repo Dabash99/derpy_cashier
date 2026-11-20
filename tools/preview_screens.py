@@ -50,6 +50,7 @@ from derby.core.theme.stylesheet import build_stylesheet  # noqa: E402
 from derby.features.auth.login_screen import LoginScreen  # noqa: E402
 from derby.features.auth.setup_screen import SetupScreen  # noqa: E402
 from derby.features.closing.closures_list_dialog import ClosuresListDialog  # noqa: E402
+from derby.features.dashboard.daily_stats_screen import DailyStatsScreen  # noqa: E402
 from derby.features.expenses.expenses_screen import ExpensesScreen  # noqa: E402
 from derby.features.expenses.expenses_service import today_business_date  # noqa: E402
 from derby.features.menu.menu_screen import MenuScreen  # noqa: E402
@@ -227,6 +228,8 @@ def main() -> int:
     _try("sales_log_screen", lambda: SalesLogScreen(conn, owner))
     _try("settings_screen", lambda: SettingsScreen(conn, owner, db_path))
     _try("supplies_screen", lambda: SuppliesScreen(conn, owner))
+    _try("daily_stats_screen_owner", lambda: DailyStatsScreen(conn, owner))
+    _try("daily_stats_screen_cashier", lambda: DailyStatsScreen(conn, cashier))
     _try("invoice_dialog", lambda: InvoiceDialog(conn, ids["paid_order_id"], is_copy=False))
     _try("payment_dialog", lambda: PaymentDialog(conn, orders_repo.get_order(conn, ids["paid_order_id"]), owner))
     _try("discount_dialog", lambda: DiscountDialog(conn, ids["busy_order_id"], owner))

@@ -142,6 +142,7 @@ def build_stylesheet() -> str:
     QLabel[role="title"] {{
         font-size: {font_size_title}px;
         font-weight: 700;
+        padding-right: 8px;
     }}
 
     QLabel[role="subtitle"] {{
@@ -150,6 +151,11 @@ def build_stylesheet() -> str:
 
     QLabel[role="error"] {{
         color: {danger};
+    }}
+
+    QLabel[role="success"] {{
+        color: {success};
+        font-weight: 600;
     }}
 
     QLabel[variant="chip"] {{
@@ -279,6 +285,23 @@ def build_stylesheet() -> str:
         color: {text_on_amber};
     }}
 
+    /* ---- Simple proportional bars (dashboard category/PS split) ---- */
+
+    QWidget[variant="barTrack"] {{
+        background-color: {surface_border};
+        border-radius: {radius_sm}px;
+    }}
+
+    QWidget[variant="barFill"] {{
+        background-color: {sidebar_background};
+        border-radius: {radius_sm}px;
+    }}
+
+    QWidget[variant="barFillAccent"] {{
+        background-color: {amber_500};
+        border-radius: {radius_sm}px;
+    }}
+
     /* ---- Tabs -------------------------------------------------- */
 
     QTabBar::tab {{
@@ -323,6 +346,7 @@ def build_stylesheet() -> str:
         ghost_border=tokens.GHOST_BORDER,
         danger=tokens.DANGER,
         danger_pressed=tokens.DANGER_PRESSED,
+        success=tokens.SUCCESS,
         disabled_fill=tokens.DISABLED_FILL,
         disabled_text=tokens.DISABLED_TEXT,
         sidebar_background=tokens.SIDEBAR_BACKGROUND,

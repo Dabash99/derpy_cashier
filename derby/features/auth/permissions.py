@@ -85,6 +85,13 @@ def view_supplies(role: str) -> bool:
     return role in (ROLE_OWNER, ROLE_CASHIER)
 
 
+def view_daily_stats(role: str) -> bool:
+    """إحصائيات اليوم is visible to both roles; profit/expenses/net
+    figures within it are gated separately by view_reports (owner only),
+    same privacy class as the Reports screen's own numbers."""
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
 def manage_supplies_costs(role: str) -> bool:
     """Entering a real cost and converting a bought item into an expense
     is a money decision -- owner only. Adding/editing/marking an item

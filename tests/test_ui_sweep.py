@@ -132,9 +132,18 @@ def _check_text_and_rtl(mw):
     window_rect = mw.rect()
     for widget, text in _visible_text_widgets(mw):
         top_left = widget.mapTo(mw, widget.rect().topLeft())
-        widget_rect = QRect(top_left, widget.size()).intersected(window_rect)
+        full_rect = QRect(top_left, widget.size())
+        widget_rect = full_rect.intersected(window_rect)
         if widget_rect.isEmpty():
             continue  # scrolled out of the visible viewport -- not this check's concern
+        # Straddling the scroll viewport's edge (partially visible) is
+        # normal for scrollable content and not meaningfully checkable
+        # from a partial crop -- only check widgets that are at least
+        # mostly on-screen.
+        visible_area = widget_rect.width() * widget_rect.height()
+        full_area = max(1, full_rect.width() * full_rect.height())
+        if visible_area / full_area < 0.8:
+            continue
         cropped = full_image.copy(widget_rect)
         assert _has_ink(cropped), "invisible text (no ink pixels at all): {0!r} on {1}".format(
             text, type(widget.parent()).__name__

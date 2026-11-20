@@ -64,7 +64,10 @@ class InvoiceDialog(QDialog):
             device_name = device["name"] if device is not None else "-"
             layout.addWidget(QLabel("{0}: {1}".format(ar.INVOICE_DEVICE_LABEL, device_name)))
         else:
-            layout.addWidget(QLabel(ar.INVOICE_TAKEAWAY_LABEL))
+            takeaway_text = ar.INVOICE_TAKEAWAY_LABEL
+            if order["label"]:
+                takeaway_text = "{0} — {1}".format(takeaway_text, order["label"])
+            layout.addWidget(QLabel(takeaway_text))
 
         for item in orders_repo.list_order_items(self._conn, order["id"]):
             line_text = "{0} × {1} — {2}".format(

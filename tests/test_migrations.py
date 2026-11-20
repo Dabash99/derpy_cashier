@@ -10,6 +10,7 @@ from derby.core.db.migrations import (
     _migration_0004_playstation,
     _migration_0005_expenses,
     _migration_0006_closing,
+    _migration_0007_supplies,
     run_pending_migrations,
 )
 
@@ -17,6 +18,24 @@ from derby.core.db.migrations import (
 def _table_names(conn):
     rows = conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
     return {row["name"] for row in rows}
+
+
+def _insert_order_pre_migration_8(conn, table_id, owner_id) -> int:
+    """orders_repo.create_order() always targets the CURRENT schema (it
+    now writes a label column added in migration 8) -- these tests
+    simulate a database still on an older migration, before that
+    column existed, so they insert directly instead."""
+    from derby.core.utils.time_utils import to_utc_iso, utc_now
+
+    cursor = conn.execute(
+        """
+        INSERT INTO orders (table_id, device_id, status, opened_at_utc, opened_by, subtotal_piasters, discount_piasters, total_piasters)
+        VALUES (?, NULL, 'open', ?, ?, 0, 0, 0)
+        """,
+        (table_id, to_utc_iso(utc_now()), owner_id),
+    )
+    conn.commit()
+    return cursor.lastrowid
 
 
 def test_migrations_from_scratch_create_all_tables(tmp_path):
@@ -85,7 +104,7 @@ def test_migration_4_preserves_phase_3_data(tmp_path):
 
     owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
     table = tables_repo.list_tables(conn)[0]
-    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+    order_id = _insert_order_pre_migration_8(conn, table["id"], owner_id)
 
     run_pending_migrations(conn)  # applies migration 4 on top
 
@@ -117,7 +136,7 @@ def test_migration_5_preserves_phase_4_data(tmp_path):
 
     owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
     table = tables_repo.list_tables(conn)[0]
-    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+    order_id = _insert_order_pre_migration_8(conn, table["id"], owner_id)
 
     run_pending_migrations(conn)  # applies migration 5 on top
 
@@ -149,7 +168,7 @@ def test_migration_6_preserves_phase_5_data(tmp_path):
 
     owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
     table = tables_repo.list_tables(conn)[0]
-    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+    order_id = _insert_order_pre_migration_8(conn, table["id"], owner_id)
 
     run_pending_migrations(conn)  # applies migration 6 on top
 
@@ -185,7 +204,7 @@ def test_migration_7_preserves_phase_6_data(tmp_path):
 
     owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
     table = tables_repo.list_tables(conn)[0]
-    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+    order_id = _insert_order_pre_migration_8(conn, table["id"], owner_id)
 
     run_pending_migrations(conn)  # applies migration 7 on top
 
@@ -196,4 +215,34 @@ def test_migration_7_preserves_phase_6_data(tmp_path):
 
     tables_in_db = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert "supplies" in tables_in_db
+    conn.close()
+
+
+def test_migration_8_preserves_phase_7_data(tmp_path):
+    """A cafe already running the supplies list must keep its data when
+    it upgrades to orders.label."""
+    db_path = tmp_path / "upgrade78.db"
+    conn = connect(db_path)
+    conn.execute("BEGIN")
+    _migration_0001_initial(conn)
+    _migration_0002_menu(conn)
+    _migration_0003_cashier(conn)
+    _migration_0004_playstation(conn)
+    _migration_0005_expenses(conn)
+    _migration_0006_closing(conn)
+    _migration_0007_supplies(conn)
+    conn.execute("PRAGMA user_version = 7")
+    conn.commit()
+
+    owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
+    table = tables_repo.list_tables(conn)[0]
+    order_id = _insert_order_pre_migration_8(conn, table["id"], owner_id)
+
+    run_pending_migrations(conn)  # applies migration 8 on top
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+    order = orders_repo.get_order(conn, order_id)
+    assert order is not None
+    assert order["table_id"] == table["id"]
+    assert order["label"] is None
     conn.close()

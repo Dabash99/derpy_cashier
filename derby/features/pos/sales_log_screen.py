@@ -143,7 +143,7 @@ class SalesLogScreen(QWidget):
 
     def _populate_row(self, row: int, order: sqlite3.Row) -> None:
         cairo_time = to_cairo(parse_utc_iso(order["paid_at_utc"])).strftime("%H:%M") if order["paid_at_utc"] else ""
-        table_text = ar.INVOICE_TAKEAWAY_LABEL
+        table_text = order["label"] or ar.INVOICE_TAKEAWAY_LABEL
         if order["table_id"]:
             table = tables_repo.get_table(self._conn, order["table_id"])
             table_text = table["name"] if table is not None else ""

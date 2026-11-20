@@ -27,6 +27,7 @@ from derby.core.db import orders_repo, ps_devices_repo, ps_sessions_repo
 from derby.core.i18n import ar
 from derby.core.theme import tokens
 from derby.core.theme.fonts import latin_numeric_font
+from derby.core.theme.tab_bar import configure_tab_widget
 from derby.core.utils.money import format_egp
 from derby.features.auth import permissions
 from derby.features.playstation import ps_service
@@ -275,6 +276,7 @@ class PlaystationScreen(QWidget):
         layout.addWidget(title)
 
         tabs = QTabWidget()
+        configure_tab_widget(tabs)
         tabs.addTab(self._build_grid_tab(), ar.PS_GRID_TAB)
         if permissions.manage_ps_devices(self._user["role"]):
             self._management_panel = PsDeviceManagementPanel(self._conn, self._user)

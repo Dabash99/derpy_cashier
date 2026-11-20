@@ -121,6 +121,7 @@ This file covers engineering rules and conventions.
     features/
       auth/ settings/ shell/              <- built in Phase 1
       menu/ pos/ tables/ playstation/ expenses/ reports/ closing/ supplies/
+      dashboard/           إحصائيات اليوم (daily stats, separate from reports/)
   assets/
     fonts/               Cairo + Montserrat (static weights) + OFL license
     logo/                original source logo (SVG + PNG) — never edited

@@ -16,6 +16,9 @@ SECTIONS = [
     ("tables", ar.SIDEBAR_TABLES, "tables", None, permissions.view_tables),
     ("sales_log", ar.SIDEBAR_SALES_LOG, "sales_log", None, permissions.view_sales_today),
     ("playstation", ar.SIDEBAR_PLAYSTATION, "playstation", None, permissions.use_ps),
+    # No dedicated "chart bars" icon asset exists yet -- reusing "reports"
+    # (closest existing shape), same stand-in approach as supplies' icon.
+    ("daily_stats", ar.SIDEBAR_DAILY_STATS, "reports", None, permissions.view_daily_stats),
     ("expenses", ar.SIDEBAR_EXPENSES, "expenses", None, permissions.can_access_expenses),
     # No dedicated icon asset exists yet for supplies -- reusing "expenses"
     # (closest existing shape) rather than leaving the sidebar button

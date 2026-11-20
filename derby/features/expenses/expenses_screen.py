@@ -24,6 +24,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import expense_categories_repo, expenses_repo
 from derby.core.i18n import ar
+from derby.core.theme.tab_bar import configure_tab_widget
 from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.money import format_egp, piasters_to_plain_text
 from derby.features.expenses import expenses_service
@@ -61,6 +62,7 @@ class ExpensesScreen(QWidget):
         layout.addWidget(title)
 
         tabs = QTabWidget()
+        configure_tab_widget(tabs)
         tabs.addTab(self._build_list_tab(), ar.EXPENSES_TITLE)
         self._categories_panel = ExpenseCategoriesPanel(self._conn, self._user)
         self._categories_panel.categories_changed.connect(self.reload)
