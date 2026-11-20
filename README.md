@@ -14,12 +14,19 @@ See [CLAUDE.md](CLAUDE.md) for engineering rules/conventions and
 |---|---|---|
 | 1 | Foundation — SQLite + migrations, PIN auth with lockout, roles/permissions, settings, main window shell, update check | ✅ done |
 | 2 | Menu — categories, products, add-ons, CSV import/export, product images | ✅ done |
-| 3 | Cashier & tables | ⏳ next |
-| 4 | PlayStation | — |
-| 5 | Printing | — |
-| 6 | Expenses & reports | — |
-| 7 | Daily closing, backup, WhatsApp report | — |
-| 8 | Delivery (packaged installer) | — |
+| 3 | Cashier & tables — cart, add-ons, discounts with approval + audit log, cash/InstaPay payment, sales log | ✅ done |
+| 4 | PlayStation — devices, Single/Multi hourly rates, timed sessions, bill transfer to/from a table | ✅ done |
+| 5 | Printing | deferred (no printer integration yet) |
+| 6 | Expenses, reports, profit, export to Excel/CSV/PDF | ✅ done |
+| 7 | Daily closing, backup/restore, WhatsApp report hand-off | ✅ done |
+| 8 | Delivery — PyInstaller build, Inno Setup installer, user guide | ✅ done |
+
+Past delivery, the app has kept growing: a supplies/shopping-list screen, an
+owner-only go-live data-cleanup tool, a takeaway ("تيك أواي") order section
+with lazy draft creation, and a daily-stats dashboard (إحصائيات اليوم)
+separate from the full reports screen. See `git log` for the detailed
+history — this table tracks the original phase plan in
+[docs/SPEC.md](docs/SPEC.md).
 
 ## Requirements
 
@@ -51,6 +58,7 @@ PIN. After that, login is PIN-only (no username).
 ```bash
 .venv\Scripts\python.exe -m pytest
 .venv\Scripts\python.exe -m ruff check .
+.venv\Scripts\python.exe -m derby --selftest
 ```
 
 ## Tech stack
@@ -67,20 +75,38 @@ derby/
   app.py              QApplication setup, font, RTL, single-instance, DB init, routing
   core/
     db/                connection, migrations, repositories
-    theme/             colors, stylesheet, bundled font loader
+    theme/             tokens, stylesheet, fonts, icons, shared tab-bar helper
     i18n/              ar.py — every Arabic string in the app
     utils/             money, time, business-day rule, PIN hashing, paths
-    updates/           the one file allowed to touch the network
+    updates/           update_check.py — the only HTTP request in the app
+    integrations/      whatsapp.py — user-initiated hand-off, no HTTP request
   features/
-    auth/ settings/ shell/ menu/     <- built
-    pos/ tables/ playstation/
-    expenses/ reports/ closing/      <- not built yet
+    auth/ settings/ shell/
+    menu/ pos/ tables/ playstation/ expenses/ reports/ closing/ supplies/
+    dashboard/         إحصائيات اليوم (daily stats, separate from reports/)
+assets/
+  fonts/               Cairo + Montserrat, bundled and loaded via QFontDatabase
+  logo/ brand/         source logo + generated brand PNGs/icons
+tools/                 dev-time scripts: build, installer, previews, asset render
+installer/             Inno Setup script + redistributables
+release/               committed version.json + user-guide PDF; installer output is gitignored
 tests/
-assets/fonts/
 ```
+
+See [CLAUDE.md](CLAUDE.md) for the full folder structure and the hard
+engineering constraints (no networking beyond the update check and the
+WhatsApp hand-off, Python 3.8-only syntax, PySide2 Qt Widgets only, money
+as integer piasters, etc).
 
 ## Notes
 
 - `menu/` (the cafe's real menu CSV + product photos) is intentionally
   **not** committed — see `.gitignore`. It's local-only data the owner
   imports through the app's Settings → Menu screen.
+- The Arabic user guide lives at [docs/USER-GUIDE-AR.md](docs/USER-GUIDE-AR.md)
+  and as a printable PDF at `release/دليل-استخدام-ديربي.pdf` (regenerate it
+  with `tools/make_user_guide_pdf.py` after changing the guide).
+- [docs/WIN7-CHECKLIST.md](docs/WIN7-CHECKLIST.md) is the manual test
+  script for a real Windows 7 machine, and
+  [docs/RELEASING.md](docs/RELEASING.md) covers building and publishing a
+  release.
