@@ -1,8 +1,8 @@
 """The right-hand navigation list. Hides sections the current role can't use."""
 from __future__ import annotations
 
-from PySide2.QtCore import QSize, Signal
-from PySide2.QtWidgets import QPushButton, QVBoxLayout, QWidget
+from PySide2.QtCore import QSize, Qt, Signal
+from PySide2.QtWidgets import QFrame, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from derby.core.i18n import ar
 from derby.core.theme import icons
@@ -35,7 +35,27 @@ class Sidebar(QWidget):
         self.setObjectName("Sidebar")
         enable_styled_background(self)
         self._buttons = {}
-        layout = QVBoxLayout(self)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # A plain QVBoxLayout here has no way to shrink once its buttons'
+        # combined natural height no longer fits the window -- Qt's
+        # layout engine responds to that deficit by overlapping items
+        # rather than scrolling (confirmed: at 1024x680 with every
+        # section enabled, button N+1 starts before button N ends). A
+        # scroll area, same pattern as the PlayStation cards and Reports
+        # sections, scrolls instead.
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setObjectName("SidebarScrollArea")
+
+        host = QWidget()
+        host.setObjectName("SidebarScrollHost")
+        layout = QVBoxLayout(host)
         layout.setContentsMargins(8, 16, 8, 16)
         layout.setSpacing(4)
 
@@ -52,6 +72,8 @@ class Sidebar(QWidget):
             self._buttons[key] = button
 
         layout.addStretch(1)
+        scroll_area.setWidget(host)
+        outer.addWidget(scroll_area)
 
     def set_active(self, key: str) -> None:
         for button_key, button in self._buttons.items():

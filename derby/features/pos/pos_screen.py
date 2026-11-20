@@ -76,6 +76,7 @@ class PosScreen(QWidget):
         while self._chooser_grid.count():
             item = self._chooser_grid.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
 
         free_tables = [

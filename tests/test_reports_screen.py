@@ -25,9 +25,9 @@ def test_daily_tab_shows_hand_calculated_summary(qapp, db_conn):
     screen.reload()
 
     assert screen._report.net_sales_piasters == 5000
-    assert "50.00" in screen._summary_label.text()
-    assert screen._payment_table.rowCount() == 2  # cash + instapay rows always shown
-    assert screen._top_items_table.rowCount() == 1
+    assert "50.00" in screen._tile_net_sales._value_label.text()
+    assert screen._payment_section.table.rowCount() == 2  # cash + instapay rows always shown
+    assert screen._top_items_section.table.rowCount() == 1
 
 
 def test_monthly_tab_per_day_table_spans_the_month(qapp, db_conn):
@@ -41,7 +41,7 @@ def test_monthly_tab_per_day_table_spans_the_month(qapp, db_conn):
     screen._monthly_input.setText("2026-01")
     screen.reload()
 
-    assert screen._per_day_table.rowCount() == 31
+    assert screen._per_day_section.table.rowCount() == 31
 
 
 def test_top_items_toggle_switches_sort_order(qapp, db_conn):
@@ -61,12 +61,12 @@ def test_top_items_toggle_switches_sort_order(qapp, db_conn):
     index_qty = screen._top_items_toggle.findData("qty")
     screen._top_items_toggle.setCurrentIndex(index_qty)
     screen._render_top_items()
-    assert screen._top_items_table.item(0, 0).text() == "كرواسون"
+    assert screen._top_items_section.table.item(0, 0).text() == "كرواسون"
 
     index_revenue = screen._top_items_toggle.findData("revenue")
     screen._top_items_toggle.setCurrentIndex(index_revenue)
     screen._render_top_items()
-    assert screen._top_items_table.item(0, 0).text() == "قهوة"
+    assert screen._top_items_section.table.item(0, 0).text() == "قهوة"
 
 
 def test_warning_banner_shown_when_open_orders_exist(qapp, db_conn):

@@ -39,11 +39,13 @@ class RecurringDueDialog(QDialog):
         while self._rows_host.count():
             item = self._rows_host.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
             elif item.layout():
                 while item.layout().count():
                     inner = item.layout().takeAt(0)
                     if inner.widget():
+                        inner.widget().hide()
                         inner.widget().deleteLater()
 
         due = expenses_service.due_templates_for_month(self._conn, self._today)

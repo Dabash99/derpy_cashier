@@ -86,6 +86,7 @@ class TablesScreen(QWidget):
         while layout.count():
             item = layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
             elif item.layout():
                 TablesScreen._clear_layout(item.layout())

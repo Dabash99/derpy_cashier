@@ -63,6 +63,7 @@ class ProductGrid(QWidget):
         while self._chips_layout.count():
             item = self._chips_layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
 
         all_button = QPushButton(ar.MENU_ALL_CATEGORIES)
@@ -83,6 +84,7 @@ class ProductGrid(QWidget):
         while self._grid_layout.count():
             item = self._grid_layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
 
         products = products_repo.list_products(self._conn, self._selected_category_id, active_only=True)

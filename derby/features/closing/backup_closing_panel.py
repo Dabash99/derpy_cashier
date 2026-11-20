@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from PySide2.QtCore import Signal
+from PySide2.QtCore import Qt, Signal
 from PySide2.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -21,6 +21,7 @@ from PySide2.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -49,7 +50,16 @@ class BackupClosingPanel(QWidget):
         self.reload()
 
     def _build_ui(self) -> None:
-        outer = QVBoxLayout(self)
+        page_layout = QVBoxLayout(self)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        # Seven form rows + status + two action rows is taller than a
+        # short tab page can give it -- same squeeze-into-overlap bug as
+        # the sidebar and the recurring-templates panel, same fix.
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        content = QWidget()
+        outer = QVBoxLayout(content)
         form = QFormLayout()
         outer.addLayout(form)
 
@@ -113,6 +123,9 @@ class BackupClosingPanel(QWidget):
         list_button.clicked.connect(self._on_open_list)
         actions_row.addWidget(list_button)
         outer.addLayout(actions_row)
+
+        scroll_area.setWidget(content)
+        page_layout.addWidget(scroll_area)
 
     def _build_folder_row(self):
         row_widget = QWidget()

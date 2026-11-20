@@ -304,6 +304,7 @@ class PlaystationScreen(QWidget):
         while self._cards_layout.count():
             item = self._cards_layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
         self._cards = {}
         for index, device in enumerate(ps_devices_repo.list_devices(self._conn, active_only=True)):

@@ -131,6 +131,7 @@ class SuppliesScreen(QWidget):
         while layout.count():
             item = layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
 
     def _build_row(self, supply: sqlite3.Row) -> QWidget:

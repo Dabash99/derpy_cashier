@@ -186,6 +186,11 @@ def build_stylesheet() -> str:
         background-color: {sidebar_background};
     }}
 
+    #SidebarScrollArea, #SidebarScrollArea QWidget {{
+        background-color: transparent;
+        border: none;
+    }}
+
     #Sidebar QPushButton, QWidget[variant="sidebar"] QPushButton {{
         background-color: transparent;
         color: {text_on_dark};
@@ -248,7 +253,8 @@ def build_stylesheet() -> str:
         color: {text_secondary};
         border: none;
         border-bottom: 1px solid {surface_border};
-        padding: {space_2}px {space_3}px;
+        padding: {space_3}px {space_3}px;
+        min-height: {header_min_height}px;
         font-weight: 600;
     }}
 
@@ -272,6 +278,20 @@ def build_stylesheet() -> str:
         background-color: {amber_100};
         color: {text_on_amber};
     }}
+
+    /* ---- Tabs -------------------------------------------------- */
+
+    QTabBar::tab {{
+        min-height: {header_min_height}px;
+        padding: {space_2}px {space_4}px;
+        margin-right: {space_1}px;
+        font-weight: 600;
+    }}
+
+    QTabBar::tab:selected {{
+        color: {amber_900};
+        border-bottom: 2px solid {amber_500};
+    }}
     """.format(
         font=FONT_FAMILY,
         font_size_body=tokens.FONT_SIZE_BODY,
@@ -289,6 +309,8 @@ def build_stylesheet() -> str:
         amber_100=tokens.AMBER_100,
         amber_300=tokens.AMBER_300,
         amber_500=tokens.AMBER_500,
+        amber_900=tokens.AMBER_900,
+        header_min_height=40,
         primary_fill=tokens.PRIMARY_FILL,
         primary_fill_hover=tokens.PRIMARY_FILL_HOVER,
         primary_fill_pressed=tokens.PRIMARY_FILL_PRESSED,

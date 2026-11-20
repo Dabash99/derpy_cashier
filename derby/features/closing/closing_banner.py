@@ -41,6 +41,11 @@ class ClosingBannerWidget(QWidget):
         while self._rows_layout.count():
             item = self._rows_layout.takeAt(0)
             if item.widget():
+                # Hide immediately -- deleteLater() alone leaves the old
+                # widget visible (and still positioned where it was)
+                # until Qt actually processes the deferred deletion,
+                # which can be one or more event-loop turns away.
+                item.widget().hide()
                 item.widget().deleteLater()
         self._status_label_by_closure_id = {}
 

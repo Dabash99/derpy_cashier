@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide2.QtCore import Signal
+from PySide2.QtCore import Qt, Signal
 from PySide2.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -16,6 +16,7 @@ from PySide2.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -41,10 +42,22 @@ class RecurringManagementPanel(QWidget):
         self.reload()
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
         title = QLabel(ar.RECURRING_TITLE)
         title.setProperty("role", "title")
-        layout.addWidget(title)
+        outer.addWidget(title)
+
+        # List + form + buttons stacked in a plain QVBoxLayout can
+        # outgrow a short tab page (confirmed: at 1024x680 it did, and
+        # Qt's layout engine responded by overlapping the form rows
+        # rather than shrinking cleanly) -- same fix as the sidebar and
+        # the reports sections.
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        content = QWidget()
+        layout = QVBoxLayout(content)
 
         self._list = QListWidget()
         self._list.currentItemChanged.connect(self._refresh_actions_state)
@@ -76,6 +89,9 @@ class RecurringManagementPanel(QWidget):
         self._toggle_active_button.clicked.connect(self._on_toggle_active)
         buttons_row.addWidget(self._toggle_active_button)
         layout.addLayout(buttons_row)
+
+        scroll_area.setWidget(content)
+        outer.addWidget(scroll_area)
 
     def _selected_template_id(self):
         item = self._list.currentItem()

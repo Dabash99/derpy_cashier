@@ -36,6 +36,7 @@ def configure_table(table: QTableWidget, stretch_columns: Iterable[int], fixed_w
 
     header = table.horizontalHeader()
     header.setMinimumSectionSize(44)
+    header.setMinimumHeight(40)
     header.setDefaultAlignment(Qt.AlignRight | Qt.AlignVCenter)
     for column in range(table.columnCount()):
         if column in stretch_columns:
@@ -45,6 +46,32 @@ def configure_table(table: QTableWidget, stretch_columns: Iterable[int], fixed_w
             table.setColumnWidth(column, fixed_widths[column])
         else:
             header.setSectionResizeMode(column, QHeaderView.ResizeToContents)
+
+
+def fit_table_height(table: QTableWidget, max_rows: int = 12) -> None:
+    """Sizes a table that sits inside a page that itself scrolls (a
+    reports section, not the one big list that owns a whole screen):
+    a plain QVBoxLayout never grows a QTableWidget to fit its rows, so
+    once several such tables share a page taller than the window, Qt's
+    layout engine squeezes every one of them down toward its
+    (near-zero) minimum size hint instead -- headers only, tiny stray
+    internal scroll arrows, no data visible. Call this once after
+    configure_table() and again every time the row count changes.
+
+    Height = header + up to max_rows rows + frame. At or under
+    max_rows, the table's own vertical scrollbar is off (every row is
+    already visible); beyond it, the table scrolls internally at a
+    sensible capped height instead of pushing the rest of the page
+    further down."""
+    header_height = max(table.horizontalHeader().sizeHint().height(), 40)
+    row_height = max(table.verticalHeader().defaultSectionSize(), tokens.CONTROL_HEIGHT_ROW)
+    frame = 2 * table.frameWidth()
+    row_count = table.rowCount()
+    visible_rows = min(max(row_count, 1), max_rows)
+    content_height = header_height + visible_rows * row_height + frame
+    table.setFixedHeight(content_height)
+    needs_scroll = row_count > max_rows
+    table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded if needs_scroll else Qt.ScrollBarAlwaysOff)
 
 
 def right_item(text: str) -> QTableWidgetItem:

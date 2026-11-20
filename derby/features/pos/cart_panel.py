@@ -101,6 +101,7 @@ class CartPanel(QWidget):
         while self._lines_layout.count():
             item = self._lines_layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
 
         order = orders_repo.get_order(self._conn, self._order_id)

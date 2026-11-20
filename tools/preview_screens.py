@@ -49,6 +49,7 @@ from derby.core.theme.fonts import load_bundled_fonts  # noqa: E402
 from derby.core.theme.stylesheet import build_stylesheet  # noqa: E402
 from derby.features.auth.login_screen import LoginScreen  # noqa: E402
 from derby.features.auth.setup_screen import SetupScreen  # noqa: E402
+from derby.features.closing.closures_list_dialog import ClosuresListDialog  # noqa: E402
 from derby.features.expenses.expenses_screen import ExpensesScreen  # noqa: E402
 from derby.features.expenses.expenses_service import today_business_date  # noqa: E402
 from derby.features.menu.menu_screen import MenuScreen  # noqa: E402
@@ -117,6 +118,19 @@ def _seed(conn) -> dict:
     supplies_service.add_supply(conn, "سكر", "كيلوجرامين", supplies_service.PRIORITY_URGENT, None, owner_id)
     bought = supplies_service.add_supply(conn, "فناجين قهوة", "٢٤ قطعة", supplies_service.PRIORITY_NORMAL, None, owner_id)
     supplies_service.mark_bought(conn, bought["id"], owner_id)
+
+    from derby.core.db import day_closures_repo
+
+    # Only the last one stays unsent -- several unsent rows at once would
+    # make the ClosingBannerWidget preview (and every screen under it,
+    # since it sits above the sidebar/content) unrealistically tall; the
+    # closures-list dialog still gets all 4 as history.
+    for day_index in range(4):
+        closure_id = day_closures_repo.create_closure(
+            conn, "2026-01-0{0}".format(day_index + 1), "auto", "تقرير تجريبي", 3, 5000, 1000, 4000, 0, 0
+        )
+        if day_index < 3:
+            day_closures_repo.mark_sent(conn, closure_id, owner_id)
 
     return {
         "owner_id": owner_id,
@@ -219,6 +233,7 @@ def main() -> int:
     _try("addon_dialog", lambda: AddonDialog(conn, ids["coffee_id"], "قهوة تركي"))
     _try("move_order_dialog", lambda: MoveOrderDialog(conn, ids["busy_order_id"], owner))
     _try("go_live_cleanup_dialog", lambda: GoLiveCleanupDialog(conn, owner, db_path))
+    _try("closures_list_dialog", lambda: ClosuresListDialog(conn, owner, db_path))
 
     conn.close()
     empty_conn.close()
