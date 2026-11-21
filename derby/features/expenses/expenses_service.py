@@ -13,6 +13,7 @@ from typing import List, Optional
 
 from derby.core.db import (
     audit_repo,
+    drawer_repo,
     expense_categories_repo,
     expenses_repo,
     recurring_expenses_repo,
@@ -66,6 +67,14 @@ def create_expense(
             conn, category_id, amount_piasters, expense_date.isoformat(), description, user_id,
             receipt_file=receipt_file, recurring_id=recurring_id, commit=False,
         )
+        # Every expense entered through this screen is assumed paid in
+        # cash from the drawer -- a purchase's own auto-filed expense
+        # (stock_service._file_purchase_expense) bypasses this function
+        # and records its own drawer_entries row instead, so purchases
+        # are never double-counted here.
+        drawer_repo.create_entry(
+            conn, drawer_repo.TYPE_EXPENSE, -amount_piasters, ref_type="expense", ref_id=expense_id, user_id=user_id, commit=False
+        )
         audit_repo.log(
             conn, "expense_created", user_id=user_id,
             details="expense={0} category={1} amount={2}".format(expense_id, category_id, amount_piasters),
@@ -81,8 +90,16 @@ def void_expense(conn: sqlite3.Connection, expense_id: int, reason: str, user_id
     reason = (reason or "").strip()
     if not reason:
         raise VoidReasonRequiredError("a reason is required")
+    expense = expenses_repo.get_expense(conn, expense_id)
     try:
         expenses_repo.void_expense(conn, expense_id, user_id, reason, commit=False)
+        # The ledger is append-only (see drawer_repo) -- voiding never
+        # edits/removes the original drawer_entries row, it adds a
+        # reversing one so expected cash is corrected going forward.
+        drawer_repo.create_entry(
+            conn, drawer_repo.TYPE_EXPENSE, expense["amount_piasters"], ref_type="expense", ref_id=expense_id,
+            user_id=user_id, note="عكس: {0}".format(reason), commit=False,
+        )
         audit_repo.log(conn, "expense_voided", user_id=user_id, details="expense={0} reason={1}".format(expense_id, reason))
     except Exception:
         conn.rollback()
@@ -118,7 +135,14 @@ def replace_expense(
             conn, category_id, amount_piasters, expense_date.isoformat(), description, user_id,
             receipt_file=receipt_file, recurring_id=old_expense["recurring_id"], commit=False,
         )
+        drawer_repo.create_entry(
+            conn, drawer_repo.TYPE_EXPENSE, -amount_piasters, ref_type="expense", ref_id=new_id, user_id=user_id, commit=False
+        )
         expenses_repo.void_expense(conn, expense_id, user_id, reason, replaced_by_id=new_id, commit=False)
+        drawer_repo.create_entry(
+            conn, drawer_repo.TYPE_EXPENSE, old_expense["amount_piasters"], ref_type="expense", ref_id=expense_id,
+            user_id=user_id, note="عكس: {0}".format(reason), commit=False,
+        )
         audit_repo.log(
             conn, "expense_replaced", user_id=user_id,
             details="old_expense={0} new_expense={1} old_amount={2} new_amount={3} reason={4}".format(

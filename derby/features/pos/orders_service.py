@@ -13,9 +13,18 @@ import sqlite3
 from datetime import time as time_of_day
 from typing import List, Optional
 
-from derby.core.db import audit_repo, orders_repo, products_repo, ps_sessions_repo, settings_repo, users_repo
+from derby.core.db import (
+    audit_repo,
+    drawer_repo,
+    orders_repo,
+    products_repo,
+    ps_sessions_repo,
+    settings_repo,
+    users_repo,
+)
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.time_utils import parse_utc_iso, utc_now
+from derby.features.inventory import stock_service
 from derby.features.pos import discount_math, owner_approval
 from derby.features.pos.addon_selection import validate_and_snapshot_addons
 from derby.features.pos.exceptions import (
@@ -336,6 +345,15 @@ def pay(conn: sqlite3.Connection, order_id: int, payment_method: str, requesting
         orders_repo.mark_order_paid(
             conn, order_id, invoice_no, requesting_user["id"], today, payment_method, commit=False
         )
+        stock_service.apply_sale_deductions(conn, order_id, requesting_user["id"])
+        if payment_method == "cash":
+            # InstaPay is deliberately excluded here -- it never touches
+            # the physical drawer (see docs/SPEC.md and drawer_repo.py).
+            paid_order = orders_repo.get_order(conn, order_id)
+            drawer_repo.create_entry(
+                conn, drawer_repo.TYPE_SALE_CASH, paid_order["total_piasters"], ref_type="order", ref_id=order_id,
+                user_id=requesting_user["id"], commit=False,
+            )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -355,6 +373,7 @@ def void(conn: sqlite3.Connection, order_id: int, reason: str, requesting_user: 
         raise InvalidTransitionError("order {0} is not paid (status={1})".format(order_id, order["status"]))
 
     try:
+        stock_service.reverse_sale_deductions(conn, order_id, requesting_user["id"])
         orders_repo.mark_order_void(conn, order_id, requesting_user["id"], reason, commit=False)
         audit_repo.log(
             conn, "order_voided", user_id=requesting_user["id"], details="order={0} reason={1}".format(order_id, reason)

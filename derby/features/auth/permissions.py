@@ -97,3 +97,42 @@ def manage_supplies_costs(role: str) -> bool:
     is a money decision -- owner only. Adding/editing/marking an item
     bought is open to a cashier (view_supplies)."""
     return role == ROLE_OWNER
+
+
+# --- Phase 9: inventory, drawer, profit ---------------------------------
+
+
+def manage_inventory(role: str) -> bool:
+    """Stock items, recipes, purchases, suppliers, waste, stocktake --
+    all a cost/money decision, owner only (see CLAUDE.md hard constraint
+    6: inventory/profit screens and cost data are owner-only)."""
+    return role == ROLE_OWNER
+
+
+def view_drawer(role: str) -> bool:
+    """Both roles can open الخزنة, but a cashier's view is cash-only --
+    no costs, no stock value (see view_goods_review)."""
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def manage_drawer(role: str) -> bool:
+    """Opening balance, deposits/withdrawals, and drawer counts are cash
+    handling -- open to both roles, same as the drawer being a shared
+    till a cashier works from day to day."""
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def view_goods_review(role: str) -> bool:
+    """Stock value, unpaid supplier balances -- owner only, same privacy
+    class as view_reports."""
+    return role == ROLE_OWNER
+
+
+def view_profit_report(role: str) -> bool:
+    return role == ROLE_OWNER
+
+
+def view_cost_data(role: str) -> bool:
+    """cost_at_sale_piasters / recipe cost+margin, anywhere it would show
+    in the UI (invoice line, recipe editor) -- owner only."""
+    return role == ROLE_OWNER

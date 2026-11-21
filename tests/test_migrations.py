@@ -11,6 +11,7 @@ from derby.core.db.migrations import (
     _migration_0005_expenses,
     _migration_0006_closing,
     _migration_0007_supplies,
+    _migration_0008_order_label,
     run_pending_migrations,
 )
 
@@ -148,7 +149,8 @@ def test_migration_5_preserves_phase_4_data(tmp_path):
     tables_in_db = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert {"expense_categories", "recurring_expenses", "expenses"}.issubset(tables_in_db)
     categories = conn.execute("SELECT name FROM expense_categories ORDER BY sort_order").fetchall()
-    assert [row["name"] for row in categories] == ["إيجار", "كهرباء", "مياه", "صيانة", "أدوات شغل", "أخرى"]
+    # Migration 9 (Phase 9) appends a "مشتريات" category on top of these.
+    assert [row["name"] for row in categories][:6] == ["إيجار", "كهرباء", "مياه", "صيانة", "أدوات شغل", "أخرى"]
     conn.close()
 
 
@@ -216,6 +218,111 @@ def test_migration_7_preserves_phase_6_data(tmp_path):
     tables_in_db = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert "supplies" in tables_in_db
     conn.close()
+
+
+def test_migration_9_preserves_phase_8_data(tmp_path):
+    """A cafe already running Phase 8 (order labels) must keep its data
+    and its existing paid cash sales/expenses must be backfilled into
+    the new drawer ledger when it upgrades to Phase 9 (inventory)."""
+    db_path = tmp_path / "upgrade89.db"
+    conn = connect(db_path)
+    conn.execute("BEGIN")
+    _migration_0001_initial(conn)
+    _migration_0002_menu(conn)
+    _migration_0003_cashier(conn)
+    _migration_0004_playstation(conn)
+    _migration_0005_expenses(conn)
+    _migration_0006_closing(conn)
+    _migration_0007_supplies(conn)
+    _migration_0008_order_label(conn)
+    conn.execute("PRAGMA user_version = 8")
+    conn.commit()
+
+    owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
+    table = tables_repo.list_tables(conn)[0]
+    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+    conn.execute(
+        "UPDATE orders SET status = 'paid', invoice_no = 1, paid_by = ?, paid_at_utc = '2026-01-01T10:00:00+00:00', "
+        "business_date = '2026-01-01', payment_method = 'cash', total_piasters = 1000 WHERE id = ?",
+        (owner_id, order_id),
+    )
+    category_id = conn.execute("SELECT id FROM expense_categories LIMIT 1").fetchone()[0]
+    conn.execute(
+        "INSERT INTO expenses (category_id, amount_piasters, expense_date, status, created_by, created_at_utc) "
+        "VALUES (?, 300, '2026-01-01', 'active', ?, '2026-01-01T09:00:00+00:00')",
+        (category_id, owner_id),
+    )
+    conn.commit()
+
+    run_pending_migrations(conn)  # applies migration 9 on top
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+    order = orders_repo.get_order(conn, order_id)
+    assert order is not None
+    assert order["table_id"] == table["id"]
+
+    tables_in_db = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    assert {
+        "stock_items", "suppliers", "purchases", "purchase_lines", "recipe_lines",
+        "stock_movements", "drawer_entries", "drawer_counts",
+    }.issubset(tables_in_db)
+
+    entries = conn.execute("SELECT entry_type, amount_delta_piasters FROM drawer_entries ORDER BY entry_type").fetchall()
+    assert ("expense", -300) in [(row["entry_type"], row["amount_delta_piasters"]) for row in entries]
+    assert ("sale_cash", 1000) in [(row["entry_type"], row["amount_delta_piasters"]) for row in entries]
+
+    category_names = {row["name"] for row in conn.execute("SELECT name FROM expense_categories")}
+    assert "مشتريات" in category_names
+    conn.close()
+
+
+def test_migration_9_backfill_is_idempotent_across_app_restarts(tmp_path):
+    """Reopening the app (which calls run_pending_migrations again on an
+    already-migrated database) must never re-run migration 9's backfill
+    or duplicate any drawer_entries/expense_categories rows."""
+    db_path = tmp_path / "idempotent89.db"
+    conn = connect(db_path)
+    conn.execute("BEGIN")
+    _migration_0001_initial(conn)
+    _migration_0002_menu(conn)
+    _migration_0003_cashier(conn)
+    _migration_0004_playstation(conn)
+    _migration_0005_expenses(conn)
+    _migration_0006_closing(conn)
+    _migration_0007_supplies(conn)
+    _migration_0008_order_label(conn)
+    conn.execute("PRAGMA user_version = 8")
+    conn.commit()
+
+    owner_id = users_repo.create_user(conn, "Owner", users_repo.ROLE_OWNER, "1234")
+    table = tables_repo.list_tables(conn)[0]
+    order_id = orders_repo.create_order(conn, table["id"], owner_id)
+    conn.execute(
+        "UPDATE orders SET status = 'paid', invoice_no = 1, paid_by = ?, paid_at_utc = '2026-01-01T10:00:00+00:00', "
+        "business_date = '2026-01-01', payment_method = 'cash', total_piasters = 1000 WHERE id = ?",
+        (owner_id, order_id),
+    )
+    conn.commit()
+
+    run_pending_migrations(conn)  # first "launch" after the upgrade
+    conn.close()
+
+    # Second app launch against the same file: must be a pure no-op.
+    conn2 = connect(db_path)
+    before_entries = conn2.execute("SELECT COUNT(*) AS c FROM drawer_entries").fetchone()["c"]
+    before_categories = conn2.execute("SELECT COUNT(*) AS c FROM expense_categories").fetchone()["c"]
+    before_total = conn2.execute("SELECT COALESCE(SUM(amount_delta_piasters), 0) AS t FROM drawer_entries").fetchone()["t"]
+
+    run_pending_migrations(conn2)
+
+    after_entries = conn2.execute("SELECT COUNT(*) AS c FROM drawer_entries").fetchone()["c"]
+    after_categories = conn2.execute("SELECT COUNT(*) AS c FROM expense_categories").fetchone()["c"]
+    after_total = conn2.execute("SELECT COALESCE(SUM(amount_delta_piasters), 0) AS t FROM drawer_entries").fetchone()["t"]
+
+    assert after_entries == before_entries
+    assert after_categories == before_categories
+    assert after_total == before_total
+    conn2.close()
 
 
 def test_migration_8_preserves_phase_7_data(tmp_path):

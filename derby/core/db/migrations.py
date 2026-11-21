@@ -465,6 +465,191 @@ def _migration_0008_order_label(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE orders ADD COLUMN label TEXT")
 
 
+def _migration_0009_inventory(conn: sqlite3.Connection) -> None:
+    """Phase 9: optional per-product recipes/stock, purchases/suppliers,
+    and the cash-drawer ledger. Every quantity (current_qty, min_qty,
+    qty_per_unit, movement qty_delta) is a REAL -- these are grams/ml/
+    pieces, not money, so the "money is always an integer" rule (see
+    money.py) does not apply to them. Cost snapshots that ARE money
+    (purchase totals, the per-line cost snapshot on a sold item, every
+    drawer_entries amount) stay INTEGER piasters; only avg_cost_piasters
+    and unit_cost_snapshot_piasters are REAL, since a cost per gram/ml is
+    routinely a fraction of a piaster and rounding it at every purchase
+    would make the weighted average drift.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stock_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            unit TEXT NOT NULL CHECK (unit IN ('g', 'kg', 'ml', 'l', 'piece')),
+            current_qty REAL NOT NULL DEFAULT 0,
+            min_qty REAL NOT NULL DEFAULT 0,
+            avg_cost_piasters REAL NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS suppliers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT,
+            notes TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS purchases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            supplier_id INTEGER,
+            purchase_date TEXT NOT NULL,
+            total_cost_piasters INTEGER NOT NULL DEFAULT 0,
+            is_paid INTEGER NOT NULL DEFAULT 0,
+            expense_id INTEGER,
+            note TEXT,
+            created_by INTEGER NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (supplier_id) REFERENCES suppliers (id),
+            FOREIGN KEY (expense_id) REFERENCES expenses (id),
+            FOREIGN KEY (created_by) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS purchase_lines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            purchase_id INTEGER NOT NULL,
+            stock_item_id INTEGER NOT NULL,
+            qty REAL NOT NULL CHECK (qty > 0),
+            unit_cost_piasters REAL NOT NULL,
+            total_cost_piasters INTEGER NOT NULL,
+            FOREIGN KEY (purchase_id) REFERENCES purchases (id),
+            FOREIGN KEY (stock_item_id) REFERENCES stock_items (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recipe_lines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_type TEXT NOT NULL CHECK (owner_type IN ('product', 'addon')),
+            owner_id INTEGER NOT NULL,
+            stock_item_id INTEGER NOT NULL,
+            qty_per_unit REAL NOT NULL CHECK (qty_per_unit > 0),
+            UNIQUE (owner_type, owner_id, stock_item_id),
+            FOREIGN KEY (stock_item_id) REFERENCES stock_items (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stock_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stock_item_id INTEGER NOT NULL,
+            movement_type TEXT NOT NULL CHECK (movement_type IN ('purchase', 'sale', 'waste', 'adjustment', 'return')),
+            qty_delta REAL NOT NULL,
+            unit_cost_snapshot_piasters REAL NOT NULL DEFAULT 0,
+            ref_type TEXT,
+            ref_id INTEGER,
+            user_id INTEGER,
+            note TEXT,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (stock_item_id) REFERENCES stock_items (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS drawer_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_type TEXT NOT NULL CHECK (
+                entry_type IN ('opening', 'sale_cash', 'expense', 'purchase', 'deposit', 'withdrawal', 'refund', 'count_adjustment')
+            ),
+            amount_delta_piasters INTEGER NOT NULL,
+            ref_type TEXT,
+            ref_id INTEGER,
+            user_id INTEGER,
+            note TEXT,
+            is_historical INTEGER NOT NULL DEFAULT 0,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS drawer_counts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            expected_piasters INTEGER NOT NULL,
+            counted_piasters INTEGER NOT NULL,
+            difference_piasters INTEGER NOT NULL,
+            denominations_json TEXT,
+            user_id INTEGER NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+
+    # Optional per-line cost snapshot (sum over its recipe, times qty, at
+    # the moment it was sold) -- NULL for a line with no recipe, so past
+    # profit never changes if a recipe or stock cost changes later.
+    conn.execute("ALTER TABLE order_items ADD COLUMN cost_at_sale_piasters INTEGER")
+    # Optional owner-set hourly electricity/wear cost for a PS device,
+    # separate from its billed rate -- 0 (no cost) unless the owner sets it.
+    conn.execute("ALTER TABLE ps_devices ADD COLUMN hourly_cost_piasters INTEGER NOT NULL DEFAULT 0")
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_item_date ON stock_movements (stock_item_id, created_at_utc)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_ref ON stock_movements (ref_type, ref_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_recipe_lines_owner ON recipe_lines (owner_type, owner_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_purchase_lines_purchase ON purchase_lines (purchase_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_purchases_paid ON purchases (is_paid)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_drawer_entries_created_at ON drawer_entries (created_at_utc)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_drawer_counts_created_at ON drawer_counts (created_at_utc)")
+
+    # "Supplies / مشتريات" expense category -- a paid purchase's auto-
+    # created expense is filed here, so profit reports can exclude it from
+    # operating expenses without a separate flag (see report_service).
+    conn.execute(
+        "INSERT INTO expense_categories (name, sort_order, is_active) "
+        "SELECT 'مشتريات', (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM expense_categories), 1 "
+        "WHERE NOT EXISTS (SELECT 1 FROM expense_categories WHERE name = 'مشتريات')"
+    )
+
+    # Backfill: every existing cash sale and active expense becomes a
+    # drawer_entries row, so the ledger/goods-review totals read correctly
+    # for a cafe upgrading from an earlier phase. These are marked
+    # is_historical=1 -- they feed reporting (e.g. a lifetime ledger view)
+    # but must NEVER feed the *live* expected-cash balance, which only
+    # ever starts from the most recent real 'opening' entry (see
+    # drawer_service.expected_cash_piasters). InstaPay sales are never
+    # cash -- excluded, per the drawer's own rule (see docs/SPEC.md).
+    for order in conn.execute(
+        "SELECT id, total_piasters, paid_by, paid_at_utc FROM orders WHERE status = 'paid' AND payment_method = 'cash'"
+    ).fetchall():
+        conn.execute(
+            "INSERT INTO drawer_entries (entry_type, amount_delta_piasters, ref_type, ref_id, user_id, note, is_historical, created_at_utc) "
+            "VALUES ('sale_cash', ?, 'order', ?, ?, NULL, 1, ?)",
+            (order[1], order[0], order[2], order[3]),
+        )
+    for expense in conn.execute(
+        "SELECT id, amount_piasters, created_by, created_at_utc FROM expenses WHERE status = 'active'"
+    ).fetchall():
+        conn.execute(
+            "INSERT INTO drawer_entries (entry_type, amount_delta_piasters, ref_type, ref_id, user_id, note, is_historical, created_at_utc) "
+            "VALUES ('expense', ?, 'expense', ?, ?, NULL, 1, ?)",
+            (-expense[1], expense[0], expense[2], expense[3]),
+        )
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
@@ -474,6 +659,7 @@ MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0006_closing,
     _migration_0007_supplies,
     _migration_0008_order_label,
+    _migration_0009_inventory,
 ]
 
 

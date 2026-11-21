@@ -21,7 +21,8 @@ def category_id(db_conn):
 
 def test_migration_seeds_six_categories(db_conn):
     categories = expense_categories_repo.list_categories(db_conn)
-    assert [c["name"] for c in categories] == ["إيجار", "كهرباء", "مياه", "صيانة", "أدوات شغل", "أخرى"]
+    # Migration 9 (Phase 9) appends a "مشتريات" category on top of these.
+    assert [c["name"] for c in categories][:6] == ["إيجار", "كهرباء", "مياه", "صيانة", "أدوات شغل", "أخرى"]
 
 
 def test_create_expense(db_conn, owner_id, category_id):

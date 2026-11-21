@@ -290,3 +290,14 @@ def list_item_addons(conn: sqlite3.Connection, order_item_id: int) -> List[sqlit
     return conn.execute(
         "SELECT * FROM order_item_addons WHERE order_item_id = ? ORDER BY id", (order_item_id,)
     ).fetchall()
+
+
+def set_cost_at_sale(conn: sqlite3.Connection, item_id: int, cost_at_sale_piasters: int, commit: bool = True) -> None:
+    """Phase 9: the recipe-derived cost snapshot for one sold line (0 if
+    the item/its add-ons have no recipe at all). Written once, at
+    payment time, by stock_service.apply_sale_deductions -- never
+    recomputed afterward, so a later price/recipe change cannot change
+    past profit."""
+    conn.execute("UPDATE order_items SET cost_at_sale_piasters = ? WHERE id = ?", (cost_at_sale_piasters, item_id))
+    if commit:
+        conn.commit()
