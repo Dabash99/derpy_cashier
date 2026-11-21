@@ -26,6 +26,7 @@ from derby.core.theme.stylesheet import build_stylesheet
 from derby.core.utils import error_log, platform_info
 from derby.core.utils.paths import app_data_dir, database_path, default_backup_dir
 from derby.core.utils.single_instance import SingleInstanceGuard
+from derby.core.utils.startup_cache import clear_cache_once_after_1_0_0_upgrade
 from derby.core.utils.time_utils import utc_now
 from derby.features.auth.login_screen import LoginScreen
 from derby.features.auth.setup_screen import SetupScreen
@@ -197,6 +198,12 @@ def migrate_with_pre_backup(conn, db_path: Path):
 
 def main() -> int:
     error_log.install_exception_hook()
+    try:
+        if clear_cache_once_after_1_0_0_upgrade():
+            print("تم حذف الملفات المؤقتة القديمة بعد الترقية (مرة واحدة فقط).")
+    except Exception:
+        pass  # a failed cache clear must never block startup
+
     # Must run before any window is created, or Windows keeps grouping
     # this process's taskbar entry/icon under python.exe's own identity.
     platform_info.set_windows_app_user_model_id("Derby.Cafe.POS")

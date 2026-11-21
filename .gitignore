@@ -20,6 +20,8 @@ backups/
 # the owner decides if/how this goes into version control.
 /menu/
 
-# Marker for run.bat's one-time post-Phase-9 cache clear (see run.bat).
-# Delete this file to make run.bat clear the cache again.
-.cache_cleared_v1
+# Marker for the one-time 1.0.0 -> 1.1.0 cache clear (see
+# derby/core/utils/startup_cache.py and run.bat). Never commit or
+# package it -- every install must see it absent until it has actually
+# run this exact upgrade once.
+.cache_cleared_for
