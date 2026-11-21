@@ -33,6 +33,7 @@ from derby.core.utils.money import format_egp
 from derby.features.auth import permissions
 from derby.features.dashboard import daily_stats_service
 from derby.features.dashboard.hourly_bar_chart import HourlyBarChart
+from derby.features.dashboard.open_orders_panel import OpenOrdersPanel
 from derby.features.inventory import drawer_service
 from derby.features.reports import report_service
 
@@ -124,6 +125,9 @@ class DailyStatsScreen(QWidget):
     # behaves exactly like one started from the Tables/PlayStation screens.
     takeaway_requested = Signal(str)
     navigate_requested = Signal(str)
+    # A card in the "الطلبات المفتوحة" section was tapped -- same contract
+    # as TablesScreen/PlaystationScreen's own order_opened signal.
+    order_opened = Signal(int)
 
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
@@ -210,15 +214,12 @@ class DailyStatsScreen(QWidget):
         self._pulse_tiles_row.addWidget(self._tile_low_stock)
         self._pulse_tiles_row.addStretch(1)
 
-        now_title = QLabel(ar.DASHBOARD_NOW_SECTION_TITLE)
-        now_title.setProperty("role", "subtitle")
-        content_layout.addWidget(now_title)
-        self._open_orders_label = QLabel("")
-        content_layout.addWidget(self._open_orders_label)
-        self._running_sessions_layout = QVBoxLayout()
-        content_layout.addLayout(self._running_sessions_layout)
         self._tables_status_label = QLabel("")
         content_layout.addWidget(self._tables_status_label)
+
+        self._open_orders_panel = OpenOrdersPanel(self._conn)
+        self._open_orders_panel.order_opened.connect(self.order_opened.emit)
+        content_layout.addWidget(self._open_orders_panel)
 
         # Everything below here is hidden in favor of one friendly
         # sentence when the day has no sales at all.
@@ -360,26 +361,6 @@ class DailyStatsScreen(QWidget):
         )
         low_stock_count = self._safe(lambda: len(stock_items_repo.list_low_stock(self._conn)))
         self._tile_low_stock.set_value(str(low_stock_count) if low_stock_count is not None else "—")
-
-        self._open_orders_label.setText(
-            ar.DASHBOARD_OPEN_ORDERS_LABEL.format(
-                count=stats.open_orders_count, total=format_egp(stats.open_orders_total_piasters)
-            )
-        )
-
-        self._clear_layout(self._running_sessions_layout)
-        if not stats.running_sessions:
-            self._running_sessions_layout.addWidget(QLabel(ar.DASHBOARD_NO_RUNNING_SESSIONS))
-        for session in stats.running_sessions:
-            mode_label = ar.PS_MODE_SINGLE_LABEL if session.mode == "single" else ar.PS_MODE_MULTI_LABEL
-            hours, remainder = divmod(session.elapsed_seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            time_text = "{0:02d}:{1:02d}:{2:02d}".format(hours, minutes, seconds)
-            line = ar.DASHBOARD_RUNNING_SESSION_LINE.format(
-                device=session.device_name, mode=mode_label, time=time_text,
-                price=format_egp(session.provisional_price_piasters),
-            )
-            self._running_sessions_layout.addWidget(QLabel(line))
 
         self._tables_status_label.setText(
             ar.DASHBOARD_TABLES_STATUS_LABEL.format(busy=stats.tables_busy_count, free=stats.tables_free_count)

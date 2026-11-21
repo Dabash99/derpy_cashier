@@ -71,6 +71,29 @@ def list_open_orders(conn: sqlite3.Connection) -> List[sqlite3.Row]:
     return conn.execute("SELECT * FROM orders WHERE status = 'open'").fetchall()
 
 
+def list_open_orders_with_summary(conn: sqlite3.Connection) -> List[sqlite3.Row]:
+    """Every open order (table, PlayStation device, or takeaway) plus the
+    table/device/opener names and item count, in one query -- used by the
+    Home screen's "الطلبات المفتوحة" section so it never issues a
+    per-card follow-up query."""
+    return conn.execute(
+        """
+        SELECT
+            o.*,
+            t.name AS table_name,
+            d.name AS device_name,
+            u.name AS opened_by_name,
+            (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
+        FROM orders o
+        LEFT JOIN tables t ON t.id = o.table_id
+        LEFT JOIN ps_devices d ON d.id = o.device_id
+        LEFT JOIN users u ON u.id = o.opened_by
+        WHERE o.status = 'open'
+        ORDER BY o.opened_at_utc
+        """
+    ).fetchall()
+
+
 def list_orders(
     conn: sqlite3.Connection,
     business_date: Optional[str] = None,

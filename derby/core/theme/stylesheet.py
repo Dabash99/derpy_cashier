@@ -173,12 +173,83 @@ def build_stylesheet() -> str:
         font-weight: 600;
     }}
 
+    /* ---- Chips (filter/category pills) -------------------------------- */
+
+    QPushButton[variant="chip"] {{
+        background-color: {surface};
+        color: {text_primary};
+        border: 1px solid {surface_border};
+        border-radius: {radius_pill}px;
+        padding: {space_1}px {space_4}px;
+        min-height: 32px;
+        font-weight: 600;
+    }}
+
+    QPushButton[variant="chip"]:hover {{
+        background-color: {background};
+    }}
+
+    QPushButton[variant="chip"][selected="true"] {{
+        background-color: {primary_fill};
+        color: {primary_text};
+        border: none;
+    }}
+
     /* ---- Cards / surfaces ------------------------------------------- */
 
     QFrame[variant="card"], QWidget[variant="card"] {{
         background-color: {surface};
         border: 1px solid {surface_border};
         border-radius: {radius_lg}px;
+    }}
+
+    /* ---- Home screen: open-order cards (Phase 10) ---------------------- */
+
+    QFrame[variant="openOrderCard"] {{
+        background-color: {surface};
+        border: 1px solid {surface_border};
+        border-right: 4px solid {surface_border};
+        border-radius: {radius_lg}px;
+    }}
+
+    QFrame[variant="openOrderCard"][kind="playstation"] {{
+        border-right: 4px solid {amber_500};
+    }}
+
+    QFrame[variant="openOrderCard"][kind="table"] {{
+        border-right: 4px solid {jet_black};
+    }}
+
+    QFrame[variant="openOrderCard"][kind="takeaway"] {{
+        border-right: 4px solid {black_300};
+    }}
+
+    QFrame[variant="openOrderCard"][stale="true"] {{
+        background-color: {amber_100};
+    }}
+
+    /* ---- Cashier product cards (Phase 10) ------------------------------ */
+
+    QFrame[variant="productCard"] {{
+        background-color: {surface};
+        border: 1px solid {surface_border};
+        border-radius: {radius_lg}px;
+    }}
+
+    QFrame[variant="productCard"]:hover {{
+        border: 1px solid {amber_500};
+    }}
+
+    QFrame[variant="productCard"][pressed="true"] {{
+        border: 2px solid {amber_500};
+    }}
+
+    QLabel[variant="pricePill"] {{
+        background-color: {primary_fill};
+        color: {primary_text};
+        border-radius: {radius_pill}px;
+        padding: 2px {space_3}px;
+        font-weight: 700;
     }}
 
     QWidget[variant="banner"] {{
@@ -329,6 +400,8 @@ def build_stylesheet() -> str:
         surface=tokens.SURFACE,
         surface_border=tokens.SURFACE_BORDER,
         white=tokens.WHITE,
+        jet_black=tokens.JET_BLACK,
+        black_300=tokens.BLACK_300,
         amber_100=tokens.AMBER_100,
         amber_300=tokens.AMBER_300,
         amber_500=tokens.AMBER_500,

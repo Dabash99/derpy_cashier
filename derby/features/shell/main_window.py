@@ -139,6 +139,7 @@ class MainWindow(QMainWindow):
         if daily_stats_screen is not None:
             daily_stats_screen.takeaway_requested.connect(self._on_takeaway_requested_from_tables)
             daily_stats_screen.navigate_requested.connect(self._on_navigate)
+            daily_stats_screen.order_opened.connect(self._on_order_opened_from_tables)
 
     def _on_closing_changed(self) -> None:
         if self._closing_banner is not None:
