@@ -19,3 +19,7 @@ backups/
 # Real cafe data (menu.csv + photos) -- not committed automatically;
 # the owner decides if/how this goes into version control.
 /menu/
+
+# Marker for run.bat's one-time post-Phase-9 cache clear (see run.bat).
+# Delete this file to make run.bat clear the cache again.
+.cache_cleared_v1
