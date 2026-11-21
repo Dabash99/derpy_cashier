@@ -10,10 +10,20 @@ from __future__ import annotations
 import sqlite3
 from datetime import timedelta
 
-from PySide2.QtCore import Qt, QTimer
+from PySide2.QtCore import Qt, QTimer, Signal
 from PySide2.QtGui import QHideEvent, QShowEvent
-from PySide2.QtWidgets import QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
+from PySide2.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
+from derby.core.db import stock_items_repo
 from derby.core.i18n import ar
 from derby.core.theme.stat_tile import StatTile
 from derby.core.theme.styled import enable_styled_background
@@ -21,6 +31,7 @@ from derby.core.utils.money import format_egp
 from derby.features.auth import permissions
 from derby.features.dashboard import daily_stats_service
 from derby.features.dashboard.hourly_bar_chart import HourlyBarChart
+from derby.features.inventory import drawer_service
 from derby.features.reports import report_service
 
 _REFRESH_INTERVAL_MS = 30_000
@@ -69,7 +80,49 @@ def _comparison_text_and_role(stat) -> "tuple[str, str]":
     return text, ("success" if stat.percent_change >= 0 else "error")
 
 
+class _NewInvoiceTypeDialog(QDialog):
+    """The "فاتورة بيع جديدة" chooser: تيك أواي starts a fresh takeaway
+    order directly (same hand-off the Tables screen's own takeaway
+    button uses); ترابيزة/بلايستيشن just navigate to the Tables/
+    PlayStation screens, which already show live busy/free status and
+    attach to an existing open bill or start a new one -- reusing that
+    flow instead of rebuilding table/device picking here."""
+
+    TAKEAWAY = "takeaway"
+    TABLE = "table"
+    PLAYSTATION = "playstation"
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.choice = None
+        self.setWindowTitle(ar.DASHBOARD_CHOOSE_ORDER_TYPE_TITLE)
+        layout = QVBoxLayout(self)
+        for label, choice in (
+            (ar.DASHBOARD_TYPE_TAKEAWAY, self.TAKEAWAY),
+            (ar.DASHBOARD_TYPE_TABLE, self.TABLE),
+            (ar.DASHBOARD_TYPE_PLAYSTATION, self.PLAYSTATION),
+        ):
+            button = QPushButton(label)
+            button.setProperty("variant", "primary")
+            button.clicked.connect(lambda _c=False, ch=choice: self._on_choose(ch))
+            layout.addWidget(button)
+        buttons = QDialogButtonBox(QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Cancel).setText(ar.GENERIC_CANCEL)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _on_choose(self, choice: str) -> None:
+        self.choice = choice
+        self.accept()
+
+
 class DailyStatsScreen(QWidget):
+    # Mirrors tables_screen.py's own signals -- MainWindow wires both to
+    # the same handlers, so a takeaway/table/device started from here
+    # behaves exactly like one started from the Tables/PlayStation screens.
+    takeaway_requested = Signal(str)
+    navigate_requested = Signal(str)
+
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
@@ -91,6 +144,11 @@ class DailyStatsScreen(QWidget):
         title = QLabel(ar.DASHBOARD_TITLE)
         title.setProperty("role", "title")
         outer.addWidget(title)
+
+        self._new_invoice_button = QPushButton(ar.DASHBOARD_NEW_INVOICE_BUTTON)
+        self._new_invoice_button.setProperty("variant", "primary")
+        self._new_invoice_button.clicked.connect(self._on_new_invoice)
+        outer.addWidget(self._new_invoice_button)
 
         date_row = QHBoxLayout()
         self._prev_button = QPushButton(ar.DASHBOARD_PREV_DAY_BUTTON)
@@ -131,11 +189,24 @@ class DailyStatsScreen(QWidget):
         content_layout.addLayout(self._owner_tiles_row)
         self._tile_expenses = StatTile(ar.REPORTS_SUMMARY_EXPENSES)
         self._tile_net_today = StatTile(ar.DASHBOARD_NET_TODAY_LABEL)
+        self._tile_gross_profit = StatTile(ar.DASHBOARD_GROSS_PROFIT_TODAY_LABEL)
         self._owner_tiles_row.addWidget(self._tile_expenses)
         self._owner_tiles_row.addWidget(self._tile_net_today)
+        self._owner_tiles_row.addWidget(self._tile_gross_profit)
         self._owner_tiles_row.addStretch(1)
         self._tile_expenses.setVisible(self._is_owner)
         self._tile_net_today.setVisible(self._is_owner)
+        self._tile_gross_profit.setVisible(self._is_owner)
+
+        # Both roles: a quick operational pulse -- neither tile exposes
+        # costs, so there is no permission gate here (see view_cost_data).
+        self._pulse_tiles_row = QHBoxLayout()
+        content_layout.addLayout(self._pulse_tiles_row)
+        self._tile_cash_in_drawer = StatTile(ar.DASHBOARD_CASH_IN_DRAWER_LABEL)
+        self._tile_low_stock = StatTile(ar.DASHBOARD_LOW_STOCK_LABEL)
+        self._pulse_tiles_row.addWidget(self._tile_cash_in_drawer)
+        self._pulse_tiles_row.addWidget(self._tile_low_stock)
+        self._pulse_tiles_row.addStretch(1)
 
         now_title = QLabel(ar.DASHBOARD_NOW_SECTION_TITLE)
         now_title.setProperty("role", "subtitle")
@@ -212,6 +283,19 @@ class DailyStatsScreen(QWidget):
         super().hideEvent(event)
         self._timer.stop()
 
+    # --- new-invoice flow ----------------------------------------------
+
+    def _on_new_invoice(self) -> None:
+        dialog = _NewInvoiceTypeDialog(self)
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        if dialog.choice == _NewInvoiceTypeDialog.TAKEAWAY:
+            self.takeaway_requested.emit("")
+        elif dialog.choice == _NewInvoiceTypeDialog.TABLE:
+            self.navigate_requested.emit("tables")
+        elif dialog.choice == _NewInvoiceTypeDialog.PLAYSTATION:
+            self.navigate_requested.emit("playstation")
+
     # --- date switcher (last 7 business days) -------------------------------
 
     def _on_prev_day(self) -> None:
@@ -254,6 +338,11 @@ class DailyStatsScreen(QWidget):
         if self._is_owner:
             self._tile_expenses.set_value(format_egp(report.expenses_total_piasters))
             self._tile_net_today.set_value(format_egp(report.profit_piasters))
+            self._tile_gross_profit.set_value(format_egp(report.gross_profit_piasters))
+
+        cash_in_drawer = drawer_service.expected_cash_piasters(self._conn)
+        self._tile_cash_in_drawer.set_value(format_egp(cash_in_drawer) if cash_in_drawer is not None else "—")
+        self._tile_low_stock.set_value(str(len(stock_items_repo.list_low_stock(self._conn))))
 
         self._open_orders_label.setText(
             ar.DASHBOARD_OPEN_ORDERS_LABEL.format(
