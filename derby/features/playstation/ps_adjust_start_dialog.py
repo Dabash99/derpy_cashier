@@ -6,7 +6,7 @@ wall-clock time; ps_service rejects anything in the future or more than
 from __future__ import annotations
 
 import sqlite3
-from datetime import timezone
+from datetime import timedelta, timezone
 
 from PySide2.QtWidgets import QDialog, QFormLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
@@ -73,6 +73,17 @@ class PsAdjustStartDialog(QDialog):
             return
 
         new_utc = new_cairo.astimezone(timezone.utc)
+        # The time field has no date, so it is read as being on the
+        # session's own Cairo calendar day. If the session started just
+        # after local midnight, that day is already "in the future"
+        # relative to now for most times the owner would type (e.g.
+        # session started 00:04, owner means "23:54 last night", not
+        # 23:54 the same calendar day, ~24h ahead) -- fall back to the
+        # previous day in that case instead of rejecting a legitimate
+        # backdate as "in the future".
+        if new_utc > utc_now():
+            new_cairo = new_cairo - timedelta(days=1)
+            new_utc = new_cairo.astimezone(timezone.utc)
 
         try:
             ps_service.adjust_session_start(
