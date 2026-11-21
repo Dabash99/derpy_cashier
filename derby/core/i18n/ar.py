@@ -690,6 +690,7 @@ DASHBOARD_TYPE_TABLE = "ترابيزة"
 DASHBOARD_TYPE_PLAYSTATION = "بلايستيشن"
 DASHBOARD_LOW_STOCK_LABEL = "عناصر ناقصة في المخزون"
 DASHBOARD_CASH_IN_DRAWER_LABEL = "النقدية في الدرج"
+DASHBOARD_DRAWER_NOT_OPENED = "افتح الدرج"
 DASHBOARD_GROSS_PROFIT_TODAY_LABEL = "إجمالي الربح اليوم"
 
 # Recipe editor (opened from a product/add-on edit screen)

@@ -8,6 +8,7 @@ report_service.build_report() -- no duplicated sales/PS math here.
 from __future__ import annotations
 
 import sqlite3
+import sys
 from datetime import timedelta
 
 from PySide2.QtCore import Qt, QTimer, Signal
@@ -27,6 +28,7 @@ from derby.core.db import stock_items_repo
 from derby.core.i18n import ar
 from derby.core.theme.stat_tile import StatTile
 from derby.core.theme.styled import enable_styled_background
+from derby.core.utils import error_log
 from derby.core.utils.money import format_egp
 from derby.features.auth import permissions
 from derby.features.dashboard import daily_stats_service
@@ -283,6 +285,18 @@ class DailyStatsScreen(QWidget):
         super().hideEvent(event)
         self._timer.stop()
 
+    def _safe(self, fn):
+        """Runs a tile's data lookup in isolation: one failing tile (e.g.
+        a drawer/stock query hitting an unexpected schema state) must
+        never take down the whole dashboard right after login -- it logs
+        the error the same way the app's global crash handler would and
+        the caller falls back to a placeholder instead of crashing."""
+        try:
+            return fn()
+        except Exception:
+            error_log.log_exception(*sys.exc_info())
+            return None
+
     # --- new-invoice flow ----------------------------------------------
 
     def _on_new_invoice(self) -> None:
@@ -340,9 +354,12 @@ class DailyStatsScreen(QWidget):
             self._tile_net_today.set_value(format_egp(report.profit_piasters))
             self._tile_gross_profit.set_value(format_egp(report.gross_profit_piasters))
 
-        cash_in_drawer = drawer_service.expected_cash_piasters(self._conn)
-        self._tile_cash_in_drawer.set_value(format_egp(cash_in_drawer) if cash_in_drawer is not None else "—")
-        self._tile_low_stock.set_value(str(len(stock_items_repo.list_low_stock(self._conn))))
+        cash_in_drawer = self._safe(lambda: drawer_service.expected_cash_piasters(self._conn))
+        self._tile_cash_in_drawer.set_value(
+            format_egp(cash_in_drawer) if isinstance(cash_in_drawer, int) else ar.DASHBOARD_DRAWER_NOT_OPENED
+        )
+        low_stock_count = self._safe(lambda: len(stock_items_repo.list_low_stock(self._conn)))
+        self._tile_low_stock.set_value(str(low_stock_count) if low_stock_count is not None else "—")
 
         self._open_orders_label.setText(
             ar.DASHBOARD_OPEN_ORDERS_LABEL.format(

@@ -680,6 +680,39 @@ def _migration_0010_stock_movement_business_date(conn: sqlite3.Connection) -> No
     conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_business_date ON stock_movements (business_date)")
 
 
+def _migration_0011_drawer_entries_is_historical_repair(conn: sqlite3.Connection) -> None:
+    """Repairs a real-world schema drift: `drawer_entries.is_historical`
+    was added by editing migration 0009's body in place, during the
+    same development session that first wrote it -- a violation of
+    "never edit a past migration" that went unnoticed because no
+    committed release had shipped yet. By the time it was caught, this
+    project's own dev machine had already run the ORIGINAL (column-less)
+    migration 0009 once for real, via run.bat, which set
+    PRAGMA user_version to 9 -- so that database's drawer_entries table
+    permanently lacks the column, and every later attempt to read or
+    write a drawer_entries row (the dashboard's cash-in-drawer tile, any
+    cash sale, expense, purchase, deposit, or drawer open/count) raises
+    "no such column: is_historical" and crashes right after login (see
+    docs/FIX_TZ_CACHE_REPORT.md).
+
+    This migration is defensive rather than assuming that drift: it only
+    adds the column if `PRAGMA table_info` shows it is actually missing
+    (a database created from the CURRENT migrations.py already has it
+    from migration 0009 itself, so this is then a complete no-op). When
+    it does add the column, every existing row is marked historical --
+    safe because, with the column missing, no row could have been
+    written by any live drawer_repo.create_entry() call either (that
+    INSERT always names is_historical), so every row already in the
+    table at this point can only have come from migration 0009's own
+    one-time backfill of pre-existing cash sales/expenses.
+    """
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(drawer_entries)").fetchall()}
+    if "is_historical" in columns:
+        return
+    conn.execute("ALTER TABLE drawer_entries ADD COLUMN is_historical INTEGER NOT NULL DEFAULT 0")
+    conn.execute("UPDATE drawer_entries SET is_historical = 1")
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
@@ -691,6 +724,7 @@ MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0008_order_label,
     _migration_0009_inventory,
     _migration_0010_stock_movement_business_date,
+    _migration_0011_drawer_entries_is_historical_repair,
 ]
 
 
