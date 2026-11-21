@@ -57,6 +57,14 @@ def _day_section(day_report: ReportResult, top_items_limit: int, show_ps_detail:
             lines.append("الإجمالي: {0}".format(format_egp(day_report.ps_total_revenue_piasters)))
 
     lines.append("مصروفات اليوم: {0}".format(format_egp(day_report.expenses_total_piasters)))
+    # Phase 9: gross/net profit (COGS-aware) sit alongside the plain
+    # net-sales-minus-expenses figure the line below has always shown --
+    # both numbers are real, they just answer different questions (see
+    # report_service's docstring).
+    lines.append("الربح الإجمالي: {0}".format(format_egp(day_report.gross_profit_piasters)))
+    lines.append("الربح الصافي: {0}".format(format_egp(day_report.net_profit_piasters)))
+    if day_report.waste_cost_piasters:
+        lines.append("تكلفة الهالك: {0}".format(format_egp(day_report.waste_cost_piasters)))
     lines.append("*صافي اليوم: {0}*".format(format_egp(day_report.net_sales_piasters - day_report.expenses_total_piasters)))
     return "\n".join(lines)
 
@@ -67,13 +75,19 @@ def _month_section(month_report: ReportResult) -> str:
         "إجمالي المبيعات: {0}".format(format_egp(month_report.net_sales_piasters)),
         "المصروفات: {0}".format(format_egp(month_report.expenses_total_piasters)),
         "الربح: {0}".format(format_egp(month_report.profit_piasters)),
+        "الربح الصافي (بعد تكلفة البضاعة): {0}".format(format_egp(month_report.net_profit_piasters)),
         "متوسط اليوم: {0}".format(format_egp(month_report.average_per_day_piasters)),
     ]
     return "\n".join(lines)
 
 
 def _warnings_section(
-    open_orders_count: int, running_sessions_count: int, previous_day_names: List[str], backup_status_line: Optional[str]
+    open_orders_count: int,
+    running_sessions_count: int,
+    previous_day_names: List[str],
+    backup_status_line: Optional[str],
+    low_stock_count: int = 0,
+    drawer_count_difference_piasters: Optional[int] = None,
 ) -> Optional[str]:
     lines = []
     if open_orders_count or running_sessions_count:
@@ -81,6 +95,15 @@ def _warnings_section(
     if previous_day_names:
         shown = previous_day_names[:_MAX_PREVIOUS_DAY_NAMES]
         lines.append("⚠️ من يوم سابق: {0}".format("، ".join(shown)))
+    if low_stock_count:
+        lines.append("⚠️ عناصر ناقصة في المخزون: {0}".format(low_stock_count))
+    if drawer_count_difference_piasters is not None:
+        if drawer_count_difference_piasters == 0:
+            lines.append("جرد الدرج: مطابق تمامًا")
+        elif drawer_count_difference_piasters > 0:
+            lines.append("جرد الدرج: زيادة {0}".format(format_egp(drawer_count_difference_piasters)))
+        else:
+            lines.append("جرد الدرج: عجز {0}".format(format_egp(-drawer_count_difference_piasters)))
     if backup_status_line:
         lines.append(backup_status_line)
     if not lines:
@@ -97,6 +120,8 @@ def build_closing_text(
     running_sessions_count: int = 0,
     previous_day_names: Optional[List[str]] = None,
     backup_status_line: Optional[str] = None,
+    low_stock_count: int = 0,
+    drawer_count_difference_piasters: Optional[int] = None,
     max_length: int = TARGET_LENGTH,
 ) -> str:
     previous_day_names = previous_day_names or []
@@ -107,7 +132,10 @@ def build_closing_text(
             _day_section(day_report, top_items_limit, show_ps_detail),
             _month_section(month_report),
         ]
-        warnings = _warnings_section(open_orders_count, running_sessions_count, previous_day_names, backup_status_line)
+        warnings = _warnings_section(
+            open_orders_count, running_sessions_count, previous_day_names, backup_status_line,
+            low_stock_count=low_stock_count, drawer_count_difference_piasters=drawer_count_difference_piasters,
+        )
         if warnings:
             blocks.append(warnings)
         return "\n\n".join(blocks)

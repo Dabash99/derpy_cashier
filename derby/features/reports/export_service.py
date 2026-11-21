@@ -55,6 +55,13 @@ def report_sections(report: ReportResult) -> List[ExportSection]:
             ["متوسط اليوم", report.average_per_day_piasters],
             ["إجمالي المصروفات", report.expenses_total_piasters],
             ["الربح", report.profit_piasters],
+            ["تكلفة البضاعة المباعة", report.cogs_piasters],
+            ["الربح الإجمالي", report.gross_profit_piasters],
+            ["المصروفات التشغيلية", report.operating_expenses_piasters],
+            ["الربح الصافي", report.net_profit_piasters],
+            ["إيرادات الكافيه", report.food_drinks_revenue_piasters],
+            ["إيرادات البلايستيشن", report.ps_total_revenue_piasters],
+            ["تكلفة الهالك", report.waste_cost_piasters],
         ],
         money_columns=(1,),
     )
@@ -109,8 +116,21 @@ def report_sections(report: ReportResult) -> List[ExportSection]:
         money_columns=(2, 3, 4),
     )
 
+    top_by_profit = ExportSection(
+        "الأصناف الأكثر ربحًا",
+        ["الصنف", "الإيراد (ج.م)", "الربح (ج.م)"],
+        [[item.name, item.revenue_piasters, item.profit_piasters] for item in report.top_items_by_profit],
+        money_columns=(1, 2),
+    )
+    low_margin = ExportSection(
+        "هامش منخفض أو سالب",
+        ["الصنف", "الإيراد (ج.م)", "الربح (ج.م)"],
+        [[item.name, item.revenue_piasters, item.profit_piasters] for item in report.low_margin_items],
+        money_columns=(1, 2),
+    )
+
     return [
-        invoice_count, summary, payment_methods, top_by_qty, top_by_revenue,
+        invoice_count, summary, payment_methods, top_by_qty, top_by_revenue, top_by_profit, low_margin,
         sales_by_category, ps_devices, expenses_by_category, per_day,
     ]
 
@@ -151,6 +171,54 @@ def sales_log_sections(order_rows, table_text_by_order, cashier_name_by_order) -
         money_columns=(2,),
     )
     return [section]
+
+
+def stock_sections(stock_items) -> List[ExportSection]:
+    rows = [
+        [
+            item["name"], item["unit"], item["current_qty"], item["min_qty"],
+            int(round(item["avg_cost_piasters"])),
+            int(round(item["current_qty"] * item["avg_cost_piasters"])),
+        ]
+        for item in stock_items
+    ]
+    section = ExportSection(
+        "المخزون", ["الاسم", "الوحدة", "الكمية", "الحد الأدنى", "متوسط التكلفة (ج.م)", "القيمة (ج.م)"],
+        rows, money_columns=(4, 5),
+    )
+    return [section]
+
+
+def purchases_sections(purchases, supplier_name_by_id) -> List[ExportSection]:
+    rows = [
+        [
+            purchase["purchase_date"], supplier_name_by_id.get(purchase["supplier_id"], "—"),
+            purchase["total_cost_piasters"], "مدفوع" if purchase["is_paid"] else "غير مدفوع",
+        ]
+        for purchase in purchases
+    ]
+    section = ExportSection(
+        "المشتريات", ["التاريخ", "المورد", "الإجمالي (ج.م)", "الحالة"], rows, money_columns=(2,)
+    )
+    return [section]
+
+
+def drawer_sections(entries, counts) -> List[ExportSection]:
+    entry_rows = [
+        [entry["created_at_utc"][:16].replace("T", " "), entry["entry_type"], entry["amount_delta_piasters"], entry["note"] or ""]
+        for entry in entries
+    ]
+    entries_section = ExportSection(
+        "سجل الحركة", ["الوقت", "النوع", "المبلغ (ج.م)", "ملاحظة"], entry_rows, money_columns=(2,)
+    )
+    count_rows = [
+        [count["created_at_utc"][:16].replace("T", " "), count["expected_piasters"], count["counted_piasters"], count["difference_piasters"]]
+        for count in counts
+    ]
+    counts_section = ExportSection(
+        "سجل الجرد", ["الوقت", "المتوقع (ج.م)", "المعدود (ج.م)", "الفرق (ج.م)"], count_rows, money_columns=(1, 2, 3)
+    )
+    return [entries_section, counts_section]
 
 
 # --- CSV ---------------------------------------------------------------------
@@ -352,3 +420,27 @@ def export_sales_log_csv(order_rows, table_text_by_order, cashier_name_by_order,
 
 def export_sales_log_xlsx(order_rows, table_text_by_order, cashier_name_by_order, path: Path) -> None:
     write_xlsx_sections(sales_log_sections(order_rows, table_text_by_order, cashier_name_by_order), path)
+
+
+def export_stock_csv(stock_items, path: Path) -> None:
+    write_csv_sections(stock_sections(stock_items), path)
+
+
+def export_stock_xlsx(stock_items, path: Path) -> None:
+    write_xlsx_sections(stock_sections(stock_items), path)
+
+
+def export_purchases_csv(purchases, supplier_name_by_id, path: Path) -> None:
+    write_csv_sections(purchases_sections(purchases, supplier_name_by_id), path)
+
+
+def export_purchases_xlsx(purchases, supplier_name_by_id, path: Path) -> None:
+    write_xlsx_sections(purchases_sections(purchases, supplier_name_by_id), path)
+
+
+def export_drawer_csv(entries, counts, path: Path) -> None:
+    write_csv_sections(drawer_sections(entries, counts), path)
+
+
+def export_drawer_xlsx(entries, counts, path: Path) -> None:
+    write_xlsx_sections(drawer_sections(entries, counts), path)

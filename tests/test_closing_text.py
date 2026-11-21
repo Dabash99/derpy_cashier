@@ -124,3 +124,24 @@ def test_text_never_exceeds_hard_cap_even_with_many_devices():
     day = _day_report(ps_devices=many_devices)
     text = build_closing_text("ديربي", date(2026, 1, 10), day, _month_report())
     assert len(text) <= 1800
+
+
+def test_phase9_gross_net_waste_and_low_stock_and_drawer_count_appear():
+    day = _day_report(gross_profit_piasters=130000, net_profit_piasters=110000, waste_cost_piasters=500)
+    month = _month_report(net_profit_piasters=2500000)
+    text = build_closing_text(
+        "ديربي", date(2026, 1, 10), day, month,
+        low_stock_count=3, drawer_count_difference_piasters=-200,
+    )
+    assert "الربح الإجمالي" in text
+    assert "الربح الصافي: " in text
+    assert "تكلفة الهالك" in text
+    assert "عناصر ناقصة في المخزون: 3" in text
+    assert "جرد الدرج: عجز" in text
+
+
+def test_drawer_count_exact_match_line():
+    text = build_closing_text(
+        "ديربي", date(2026, 1, 10), _day_report(), _month_report(), drawer_count_difference_piasters=0
+    )
+    assert "جرد الدرج: مطابق تمامًا" in text

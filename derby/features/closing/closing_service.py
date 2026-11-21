@@ -15,9 +15,11 @@ from derby.core.db import (
     audit_repo,
     backup_log_repo,
     day_closures_repo,
+    drawer_repo,
     orders_repo,
     ps_devices_repo,
     settings_repo,
+    stock_items_repo,
     tables_repo,
 )
 from derby.core.i18n import ar
@@ -141,6 +143,15 @@ def close_or_rebuild_day(
     )
     backup_status_line = _backup_status_line(primary, secondary, secondary_dir is not None)
 
+    low_stock_count = len(stock_items_repo.list_low_stock(conn))
+    drawer_count_difference = None
+    last_count = drawer_repo.get_last_count(conn)
+    if last_count is not None:
+        close_time = _close_time_setting(conn)
+        count_business_date = compute_business_date(parse_utc_iso(last_count["created_at_utc"]), close_time)
+        if count_business_date == business_date_value:
+            drawer_count_difference = last_count["difference_piasters"]
+
     text = closing_text.build_closing_text(
         cafe_name,
         business_date_value,
@@ -150,6 +161,8 @@ def close_or_rebuild_day(
         running_sessions_count=day_report.running_sessions_count,
         previous_day_names=previous_day_names,
         backup_status_line=backup_status_line,
+        low_stock_count=low_stock_count,
+        drawer_count_difference_piasters=drawer_count_difference,
     )
     profit = day_report.net_sales_piasters - day_report.expenses_total_piasters
 

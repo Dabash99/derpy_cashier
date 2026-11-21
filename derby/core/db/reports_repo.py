@@ -30,7 +30,7 @@ def list_product_item_rows(conn: sqlite3.Connection, order_ids: Sequence[int]) -
     return conn.execute(
         """
         SELECT oi.name_snapshot AS name, oi.qty AS qty, oi.line_total_piasters AS revenue_piasters,
-               c.name AS category_name
+               COALESCE(oi.cost_at_sale_piasters, 0) AS cost_piasters, c.name AS category_name
         FROM order_items oi
         LEFT JOIN products p ON p.id = oi.product_id
         LEFT JOIN categories c ON c.id = p.category_id
@@ -49,8 +49,8 @@ def list_ps_item_rows(conn: sqlite3.Connection, order_ids: Sequence[int]) -> Lis
     placeholders = ",".join("?" for _ in order_ids)
     return conn.execute(
         """
-        SELECT oi.line_total_piasters AS revenue_piasters, oi.ps_session_id AS ps_session_id,
-               ps.device_name_snapshot AS device_name, ps.actual_minutes AS actual_minutes
+        SELECT oi.line_total_piasters AS revenue_piasters, COALESCE(oi.cost_at_sale_piasters, 0) AS cost_piasters,
+               oi.ps_session_id AS ps_session_id, ps.device_name_snapshot AS device_name, ps.actual_minutes AS actual_minutes
         FROM order_items oi
         LEFT JOIN ps_sessions ps ON ps.id = oi.ps_session_id
         WHERE oi.kind = 'ps_time' AND oi.order_id IN ({0})

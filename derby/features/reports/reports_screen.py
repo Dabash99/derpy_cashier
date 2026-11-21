@@ -150,6 +150,19 @@ class ReportsScreen(QWidget):
             [ar.REPORTS_COLUMN_DATE, ar.REPORTS_COLUMN_INVOICES, ar.REPORTS_COLUMN_NET_SALES, ar.REPORTS_COLUMN_EXPENSES, ar.REPORTS_COLUMN_PROFIT],
         )
 
+        profit_title = QLabel(ar.REPORTS_TAB_PROFIT)
+        profit_title.setProperty("role", "title")
+        content_layout.addWidget(profit_title)
+        content_layout.addLayout(self._build_profit_stat_tiles())
+        self._top_by_profit_section = self._add_section(
+            content_layout, ar.PROFIT_TOP_BY_PROFIT_TITLE,
+            [ar.REPORTS_COLUMN_ITEM_NAME, ar.REPORTS_COLUMN_REVENUE, ar.PROFIT_GROSS_LABEL],
+        )
+        self._low_margin_section = self._add_section(
+            content_layout, ar.PROFIT_LOW_MARGIN_TITLE,
+            [ar.REPORTS_COLUMN_ITEM_NAME, ar.REPORTS_COLUMN_REVENUE, ar.PROFIT_GROSS_LABEL],
+        )
+
         content_layout.addStretch(1)
 
         self._export_panel = ExportPanel(self._default_filename_stem)
@@ -191,6 +204,22 @@ class ReportsScreen(QWidget):
         row.addWidget(self._tile_expenses)
         row.addWidget(self._tile_profit)
         row.addStretch(1)
+        return row
+
+    def _build_profit_stat_tiles(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        self._tile_cogs = StatTile(ar.PROFIT_COGS_LABEL)
+        self._tile_gross_profit = StatTile(ar.PROFIT_GROSS_LABEL)
+        self._tile_operating_expenses = StatTile(ar.PROFIT_OPERATING_EXPENSES_LABEL)
+        self._tile_net_profit = StatTile(ar.PROFIT_NET_LABEL)
+        self._tile_food_revenue = StatTile(ar.PROFIT_FOOD_REVENUE_LABEL)
+        self._tile_ps_revenue = StatTile(ar.PROFIT_PS_REVENUE_LABEL)
+        self._tile_waste_cost = StatTile(ar.PROFIT_WASTE_COST_LABEL)
+        for tile in (
+            self._tile_cogs, self._tile_gross_profit, self._tile_operating_expenses, self._tile_net_profit,
+            self._tile_food_revenue, self._tile_ps_revenue, self._tile_waste_cost,
+        ):
+            row.addWidget(tile)
         return row
 
     def _add_section(self, content_layout: QVBoxLayout, title_text: str, headers, extra_header_widget: QWidget = None) -> _TableSection:
@@ -317,6 +346,24 @@ class ReportsScreen(QWidget):
                 for d in report.per_day
             ]
         )
+
+        self._tile_cogs.set_value(format_egp(report.cogs_piasters))
+        self._tile_gross_profit.set_value(format_egp(report.gross_profit_piasters))
+        self._tile_operating_expenses.set_value(format_egp(report.operating_expenses_piasters))
+        self._tile_net_profit.set_value(format_egp(report.net_profit_piasters))
+        self._tile_food_revenue.set_value(format_egp(report.food_drinks_revenue_piasters))
+        self._tile_ps_revenue.set_value(format_egp(report.ps_total_revenue_piasters))
+        self._tile_waste_cost.set_value(format_egp(report.waste_cost_piasters))
+        self._top_by_profit_section.fill(
+            [[item.name, format_egp(item.revenue_piasters), format_egp(item.profit_piasters)] for item in report.top_items_by_profit]
+        )
+        if report.low_margin_items:
+            self._low_margin_section.fill(
+                [[item.name, format_egp(item.revenue_piasters), format_egp(item.profit_piasters)] for item in report.low_margin_items]
+            )
+        else:
+            self._low_margin_section.fill([])
+            self._low_margin_section.empty_label.setText(ar.PROFIT_EMPTY_LOW_MARGIN)
 
     def _render_top_items(self) -> None:
         if self._report is None:
