@@ -11,7 +11,7 @@ import webbrowser
 
 from PySide2.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from derby.core.db import audit_repo, settings_repo
+from derby.core.db import audit_repo
 from derby.core.i18n import ar
 from derby.core.updates.update_check import (
     FAILURE_INVALID,
@@ -19,7 +19,7 @@ from derby.core.updates.update_check import (
     FAILURE_SSL,
     UpdateCheckWorker,
 )
-from derby.core.updates.version_logic import is_allowed_download_url
+from derby.core.updates.version_logic import DEFAULT_UPDATE_MANIFEST_URL, is_allowed_download_url
 
 
 class UpdateCheckPanel(QWidget):
@@ -51,24 +51,16 @@ class UpdateCheckPanel(QWidget):
         layout.addWidget(self._status_label)
 
     def reload(self) -> None:
-        manifest_url = settings_repo.get(self._conn, "update_manifest_url", "") or ""
         self._open_download_button.hide()
-        if not manifest_url:
-            self._check_button.setEnabled(False)
-            self._status_label.setText(ar.UPDATE_CHECK_NO_URL_HINT)
-        else:
-            self._check_button.setEnabled(True)
-            self._status_label.setText("")
+        self._check_button.setEnabled(True)
+        self._status_label.setText("")
 
     def _on_check_clicked(self) -> None:
-        manifest_url = settings_repo.get(self._conn, "update_manifest_url", "") or ""
-        if not manifest_url:
-            return
         self._check_button.setEnabled(False)
         self._open_download_button.hide()
         self._status_label.setText(ar.UPDATE_CHECK_CHECKING)
 
-        self._worker = UpdateCheckWorker(manifest_url, self)
+        self._worker = UpdateCheckWorker(DEFAULT_UPDATE_MANIFEST_URL, self)
         self._worker.succeeded.connect(self._on_succeeded)
         self._worker.failed.connect(self._on_failed)
         self._worker.start()

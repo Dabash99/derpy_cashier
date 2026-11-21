@@ -81,10 +81,8 @@ SETTINGS_CLOSE_TIME_LABEL = "وقت إغلاق اليوم التجاري"
 SETTINGS_PS_MIN_MINUTES_LABEL = "أقل مدة محسوبة للبلاي ستيشن (دقيقة)"
 SETTINGS_ROUNDING_STEP_LABEL = "تقريب السعر لأقرب (جنيه)"
 SETTINGS_AUTO_LOCK_LABEL = "القفل التلقائي بعد (دقيقة)"
-SETTINGS_UPDATE_URL_LABEL = "رابط ملف التحديثات"
 SETTINGS_ERROR_INVALID_NUMBER = "من فضلك اكتب رقمًا صحيحًا"
 SETTINGS_ERROR_INVALID_TIME = "من فضلك اكتب وقتًا صحيحًا بصيغة س:د"
-SETTINGS_ERROR_INVALID_UPDATE_URL = "رابط ملف التحديثات لازم يبدأ بـ https:// (أو اتركه فارغًا لتعطيل الفحص)"
 
 # --- Advanced tools / go-live cleanup (Settings, owner only) -----------------
 ADVANCED_TOOLS_TITLE = "أدوات متقدمة"
@@ -130,7 +128,6 @@ USERS_SAVED_MESSAGE = "تم الحفظ بنجاح"
 
 # --- Update check (Settings, owner only) -------------------------------------
 UPDATE_CHECK_BUTTON = "فحص التحديثات"
-UPDATE_CHECK_NO_URL_HINT = "لم يتم ضبط رابط التحديثات بعد"
 UPDATE_CHECK_CHECKING = "جاري الفحص..."
 UPDATE_CHECK_UP_TO_DATE = "أنت على آخر نسخة"
 UPDATE_CHECK_NEW_VERSION_AVAILABLE = "يوجد إصدار جديد: {version}"

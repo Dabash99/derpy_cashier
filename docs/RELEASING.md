@@ -152,10 +152,10 @@ anyway"، وجدول كل الإصدارات السابقة مُولَّد من 
    ```
    https://raw.githubusercontent.com/Dabash99/derpy_cashier/releases/version.json
    ```
-4. في البرنامج: الإعدادات ← رابط ملف التحديثات — مُعبّى تلقائيًا
-   بهذا الرابط بالضبط كقيمة افتراضية (`update_manifest_url`)، والمالك
-   يقدر يغيّره. اضغط "فحص التحديثات" وتأكد إنه يجد الإصدار الجديد،
-   ويعرض النص العربي وبصمة SHA-256، وزر "تحميل" يفتح المتصفح على رابط
+4. في البرنامج: الإعدادات ← اضغط "فحص التحديثات" (لم يعد هناك حقل
+   قابل للتعديل -- الرابط ثابت في الكود، نفس قيمة
+   `DEFAULT_UPDATE_MANIFEST_URL`). تأكد إنه يجد الإصدار الجديد، ويعرض
+   النص العربي وبصمة SHA-256، وزر "تحميل" يفتح المتصفح على رابط
    GitHub (لا يحمّل الملف داخل البرنامج نفسه).
 
 ## 4. كيف تختبر مسار التحديث بالكامل (بدون لمس فرع `releases` الحقيقي)
@@ -163,12 +163,15 @@ anyway"، وجدول كل الإصدارات السابقة مُولَّد من 
 1. ثبّت نسخة 1.0.0 (من المثبّت الذي بنيته).
 2. ارفع رقم الإصدار لـ 1.0.1 محليًا وشغّل `tools/make_release.py` تاني
    (يبني installer 1.0.1 و `release\version.json` الخاص به).
-3. لا تلمس فرع `releases` الحقيقي لتجربة هذا — بدّل مؤقتًا رابط
-   `update_manifest_url` في الإعدادات إلى ملف `version.json` المحلي
-   (مثلًا عبر سيرفر HTTP محلي بسيط) — المهم إنه رابط اختباري غير
-   حقيقي، نفس فلسفة `tests/test_update_version_logic.py` و
+3. الرابط ثابت في الكود الآن (`DEFAULT_UPDATE_MANIFEST_URL` في
+   `derby/core/updates/version_logic.py`)، فلا يوجد حقل في الإعدادات
+   لتبديله مؤقتًا -- للتجربة بدون لمس فرع `releases` الحقيقي، عدّل
+   مؤقتًا قيمة `DEFAULT_UPDATE_MANIFEST_URL` في الكود نفسه إلى رابط
+   اختباري (مثلًا سيرفر HTTP محلي)، نفس فلسفة
+   `tests/test_update_version_logic.py` و
    `tests/test_update_check_panel.py` التي تستخدم خادمًا مزيّفًا
-   (fake server) أو mocked opener بدلًا من أي اتصال حقيقي.
+   (fake server) أو mocked opener بدلًا من أي اتصال حقيقي -- ولا تنسَ
+   تراجع التعديل بعد التجربة.
 4. تأكد أن الحوار يعرض "يوجد إصدار جديد: 1.0.1" والنص العربي والبصمة،
    وأن زر "تحميل" يفتح الرابط الصحيح.
 
@@ -230,10 +233,11 @@ then verify published asset sizes. A retry after a partial failure
 (e.g. the push succeeded but `gh release create` didn't) never
 duplicates the commit or the release.
 
-Settings -> `update_manifest_url` is prefilled by default with
-`https://raw.githubusercontent.com/Dabash99/derpy_cashier/releases/version.json`
-(the owner can still edit or clear it); the owner's manual "Check for
-Updates" button is the only thing that ever reads it. Upgrades never
+The update-check URL is a fixed constant,
+`DEFAULT_UPDATE_MANIFEST_URL` in `derby/core/updates/version_logic.py`
+(`https://raw.githubusercontent.com/Dabash99/derpy_cashier/releases/version.json`) --
+there is no Settings field for it any more. The owner's manual "Check
+for Updates" button is the only thing that ever reads it. Upgrades never
 touch `%APPDATA%\Derby`/`Documents\Derby`; database migrations take a
 verified backup first and abort (with a clear error) rather than risk
 the data if that backup fails; any backup can be restored from the

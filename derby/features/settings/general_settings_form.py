@@ -51,9 +51,6 @@ class GeneralSettingsForm(QWidget):
         self._auto_lock_input.setRange(1, 120)
         form.addRow(ar.SETTINGS_AUTO_LOCK_LABEL, self._auto_lock_input)
 
-        self._update_url_input = QLineEdit()
-        form.addRow(ar.SETTINGS_UPDATE_URL_LABEL, self._update_url_input)
-
         self._error_label = QLabel("")
         self._error_label.setProperty("role", "error")
         self._error_label.setWordWrap(True)
@@ -70,7 +67,6 @@ class GeneralSettingsForm(QWidget):
         self._ps_min_minutes_input.setValue(int(values["ps_min_minutes"]))
         self._rounding_step_input.setValue(int(values["rounding_step_egp"]))
         self._auto_lock_input.setValue(int(values["auto_lock_minutes"]))
-        self._update_url_input.setText(values["update_manifest_url"])
         self._error_label.setText("")
 
     def _on_save(self) -> None:
@@ -79,17 +75,11 @@ class GeneralSettingsForm(QWidget):
             self._error_label.setText(ar.SETTINGS_ERROR_INVALID_TIME)
             return
 
-        update_url_text = self._update_url_input.text().strip()
-        if update_url_text and not update_url_text.lower().startswith("https://"):
-            self._error_label.setText(ar.SETTINGS_ERROR_INVALID_UPDATE_URL)
-            return
-
         settings_repo.set_value(self._conn, "cafe_name", self._cafe_name_input.text().strip())
         settings_repo.set_value(self._conn, "business_close_time", close_time_text)
         settings_repo.set_value(self._conn, "ps_min_minutes", str(self._ps_min_minutes_input.value()))
         settings_repo.set_value(self._conn, "rounding_step_egp", str(self._rounding_step_input.value()))
         settings_repo.set_value(self._conn, "auto_lock_minutes", str(self._auto_lock_input.value()))
-        settings_repo.set_value(self._conn, "update_manifest_url", update_url_text)
 
         self._error_label.setText("")
         self.saved.emit()
