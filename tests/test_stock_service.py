@@ -225,3 +225,78 @@ def test_recompute_current_qty_matches_movements(db_conn, owner, flour):
     recomputed = stock_service.recompute_current_qty(db_conn, flour["id"])
     assert recomputed == 800
     assert stock_items_repo.get_stock_item(db_conn, flour["id"])["current_qty"] == 800
+
+
+# --- business_date on stock_movements follows the cafe's close-time rule ---
+
+
+def test_waste_before_close_time_lands_on_previous_business_day(db_conn, owner, flour, monkeypatch):
+    from datetime import datetime, timezone
+
+    from derby.core.db import settings_repo
+
+    settings_repo.set_value(db_conn, "business_close_time", "03:00")
+    from derby.core.utils.time_utils import to_cairo
+
+    offset = to_cairo(datetime(2026, 1, 10, 12, 0, tzinfo=timezone.utc)).utcoffset()
+    cairo_0030 = datetime(2026, 1, 10, 0, 30, 0)
+    utc_at_0030 = (cairo_0030 - offset).replace(tzinfo=timezone.utc)
+    monkeypatch.setattr("derby.features.inventory.stock_service.utc_now", lambda: utc_at_0030)
+
+    stock_service.record_waste(db_conn, flour["id"], 10, "تلف", owner["id"])
+
+    movement = stock_movements_repo.list_movements_for_item(db_conn, flour["id"])[0]
+    assert movement["business_date"] == "2026-01-09"
+
+
+def test_waste_at_0145_before_0300_close_also_lands_on_previous_day(db_conn, owner, flour, monkeypatch):
+    from datetime import datetime, timezone
+
+    from derby.core.db import settings_repo
+    from derby.core.utils.time_utils import to_cairo
+
+    settings_repo.set_value(db_conn, "business_close_time", "03:00")
+    offset = to_cairo(datetime(2026, 1, 10, 12, 0, tzinfo=timezone.utc)).utcoffset()
+    cairo_0145 = datetime(2026, 1, 10, 1, 45, 0)
+    utc_at_0145 = (cairo_0145 - offset).replace(tzinfo=timezone.utc)
+    monkeypatch.setattr("derby.features.inventory.stock_service.utc_now", lambda: utc_at_0145)
+
+    stock_service.record_waste(db_conn, flour["id"], 10, "تلف", owner["id"])
+
+    movement = stock_movements_repo.list_movements_for_item(db_conn, flour["id"])[0]
+    assert movement["business_date"] == "2026-01-09"
+
+
+def test_waste_after_close_time_lands_on_new_business_day(db_conn, owner, flour, monkeypatch):
+    from datetime import datetime, timezone
+
+    from derby.core.db import settings_repo
+    from derby.core.utils.time_utils import to_cairo
+
+    settings_repo.set_value(db_conn, "business_close_time", "03:00")
+    offset = to_cairo(datetime(2026, 1, 10, 12, 0, tzinfo=timezone.utc)).utcoffset()
+    cairo_0301 = datetime(2026, 1, 10, 3, 1, 0)
+    utc_at_0301 = (cairo_0301 - offset).replace(tzinfo=timezone.utc)
+    monkeypatch.setattr("derby.features.inventory.stock_service.utc_now", lambda: utc_at_0301)
+
+    stock_service.record_waste(db_conn, flour["id"], 10, "تلف", owner["id"])
+
+    movement = stock_movements_repo.list_movements_for_item(db_conn, flour["id"])[0]
+    assert movement["business_date"] == "2026-01-10"
+
+
+def test_waste_cost_and_report_and_closing_text_agree_on_the_same_figure(db_conn, owner, flour):
+    from derby.features.closing import closing_text
+    from derby.features.reports import report_service
+
+    stock_service.record_purchase(
+        db_conn, None, "2026-01-01", [{"stock_item_id": flour["id"], "qty": 1000, "unit_cost_piasters": 10}], False, owner["id"]
+    )
+    stock_service.record_waste(db_conn, flour["id"], 50, "تلف", owner["id"])
+
+    today = report_service.today_business_date(db_conn)
+    day_report = report_service.build_report(db_conn, today, today)
+    assert day_report.waste_cost_piasters == 500
+
+    text = closing_text.build_closing_text("ديربي", today, day_report, day_report)
+    assert "تكلفة الهالك: " in text

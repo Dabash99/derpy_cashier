@@ -8,7 +8,11 @@ matter which version it started from.
 from __future__ import annotations
 
 import sqlite3
+from datetime import time as time_of_day
 from typing import Callable, List
+
+from derby.core.utils.business_date import business_date as _compute_business_date
+from derby.core.utils.time_utils import parse_utc_iso as _parse_utc_iso
 
 
 def _migration_0001_initial(conn: sqlite3.Connection) -> None:
@@ -650,6 +654,32 @@ def _migration_0009_inventory(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migration_0010_stock_movement_business_date(conn: sqlite3.Connection) -> None:
+    """stock_movements had no business_date column (migration 0009) --
+    the waste-cost query (and any future stock-movement-by-date query)
+    was summing over plain UTC calendar dates, which can land a
+    late-night movement on the wrong side of the cafe's actual business
+    day (see docs/FIX_TZ_CACHE_REPORT.md). This adds the column and
+    backfills it with the SAME business_date() + business_close_time
+    rule orders/expenses already use -- never a second, invented rule.
+    From here on, stock_movements_repo.create_movement always receives
+    business_date as a required argument, computed by the caller
+    (stock_service) the same way orders_service/expenses_service do.
+    """
+    conn.execute("ALTER TABLE stock_movements ADD COLUMN business_date TEXT")
+
+    close_time_text = conn.execute("SELECT value FROM settings WHERE key = 'business_close_time'").fetchone()
+    close_time_value = close_time_text["value"] if close_time_text is not None else "23:59"
+    hour_str, minute_str = (close_time_value or "23:59").split(":")
+    close_time = time_of_day(int(hour_str), int(minute_str))
+
+    for row in conn.execute("SELECT id, created_at_utc FROM stock_movements WHERE business_date IS NULL").fetchall():
+        business_date_value = _compute_business_date(_parse_utc_iso(row["created_at_utc"]), close_time).isoformat()
+        conn.execute("UPDATE stock_movements SET business_date = ? WHERE id = ?", (business_date_value, row["id"]))
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_business_date ON stock_movements (business_date)")
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
@@ -660,6 +690,7 @@ MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0007_supplies,
     _migration_0008_order_label,
     _migration_0009_inventory,
+    _migration_0010_stock_movement_business_date,
 ]
 
 

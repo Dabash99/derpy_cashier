@@ -22,6 +22,7 @@ def create_movement(
     stock_item_id: int,
     movement_type: str,
     qty_delta: float,
+    business_date: str,
     unit_cost_snapshot_piasters: float = 0.0,
     ref_type: Optional[str] = None,
     ref_id: Optional[int] = None,
@@ -29,14 +30,22 @@ def create_movement(
     note: Optional[str] = None,
     commit: bool = True,
 ) -> int:
+    """`business_date` (an ISO "YYYY-MM-DD" string) is required, not
+    derived here -- this module stays pure data access, same as
+    orders_repo/expenses_repo; the caller (stock_service) computes it
+    with the same business_date()+business_close_time rule those
+    other services already use, never a second invented rule."""
     cursor = conn.execute(
         """
         INSERT INTO stock_movements (
             stock_item_id, movement_type, qty_delta, unit_cost_snapshot_piasters,
-            ref_type, ref_id, user_id, note, created_at_utc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ref_type, ref_id, user_id, note, business_date, created_at_utc
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (stock_item_id, movement_type, qty_delta, unit_cost_snapshot_piasters, ref_type, ref_id, user_id, note, to_utc_iso(utc_now())),
+        (
+            stock_item_id, movement_type, qty_delta, unit_cost_snapshot_piasters,
+            ref_type, ref_id, user_id, note, business_date, to_utc_iso(utc_now()),
+        ),
     )
     if commit:
         conn.commit()
@@ -63,14 +72,13 @@ def sum_qty_delta(conn: sqlite3.Connection, stock_item_id: int) -> float:
 
 
 def sum_waste_cost_in_range(conn: sqlite3.Connection, start_date_iso: str, end_date_iso: str) -> int:
-    """Waste cost for a calendar-date range, read off created_at_utc's
-    date portion -- stock_movements has no business_date column (unlike
-    orders/expenses), so this is the plain UTC calendar day, not the
-    cafe's late-close business day. Close enough for a report figure;
-    see docs/PHASE9_REPORT.md for the caveat."""
+    """Waste cost for a BUSINESS-date range (not a UTC calendar-date
+    range) -- matches exactly how orders/expenses are ranged in
+    report_service, so a late-night waste entry lands on the same
+    business day as a late-night sale or expense would."""
     row = conn.execute(
         "SELECT COALESCE(SUM(-qty_delta * unit_cost_snapshot_piasters), 0) AS total FROM stock_movements "
-        "WHERE movement_type = 'waste' AND substr(created_at_utc, 1, 10) BETWEEN ? AND ?",
+        "WHERE movement_type = 'waste' AND business_date BETWEEN ? AND ?",
         (start_date_iso, end_date_iso),
     ).fetchone()
     return int(round(row["total"]))
