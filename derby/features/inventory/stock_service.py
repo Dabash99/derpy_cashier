@@ -250,13 +250,8 @@ def record_waste(conn: sqlite3.Connection, stock_item_id: int, qty: float, reaso
     return stock_items_repo.get_stock_item(conn, stock_item_id)
 
 
-def waste_cost_piasters(conn: sqlite3.Connection, start_utc: str, end_utc: str) -> int:
-    row = conn.execute(
-        "SELECT COALESCE(SUM(-qty_delta * unit_cost_snapshot_piasters), 0) AS total FROM stock_movements "
-        "WHERE movement_type = 'waste' AND created_at_utc >= ? AND created_at_utc <= ?",
-        (start_utc, end_utc),
-    ).fetchone()
-    return int(round(row["total"]))
+def waste_cost_piasters(conn: sqlite3.Connection, start_date_iso: str, end_date_iso: str) -> int:
+    return stock_movements_repo.sum_waste_cost_in_range(conn, start_date_iso, end_date_iso)
 
 
 def record_stocktake(conn: sqlite3.Connection, stock_item_id: int, counted_qty: float, user_id: int, note: Optional[str] = None) -> sqlite3.Row:

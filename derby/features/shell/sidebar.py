@@ -9,16 +9,29 @@ from derby.core.theme import icons
 from derby.core.theme.styled import enable_styled_background
 from derby.features.auth import permissions
 
+
+def _everyone(_role: str) -> bool:
+    return True
+
+
 # (key, label, icon name in assets/brand/icons, phase-if-not-built-yet, permission check)
+# "daily_stats" (الرئيسية) is first on purpose: Phase 9 makes it the
+# default landing route for every role, with the new-invoice flow and
+# live tiles at its top (see daily_stats_screen.py) -- "إحصائيات اليوم"
+# is now a section within it, not a separate page.
 SECTIONS = [
+    ("daily_stats", ar.SIDEBAR_HOME, "reports", None, _everyone),
     ("menu", ar.SIDEBAR_MENU, "menu", None, permissions.can_manage_menu),
     ("pos", ar.SIDEBAR_CASHIER, "cashier", None, permissions.use_pos),
     ("tables", ar.SIDEBAR_TABLES, "tables", None, permissions.view_tables),
     ("sales_log", ar.SIDEBAR_SALES_LOG, "sales_log", None, permissions.view_sales_today),
     ("playstation", ar.SIDEBAR_PLAYSTATION, "playstation", None, permissions.use_ps),
-    # No dedicated "chart bars" icon asset exists yet -- reusing "reports"
-    # (closest existing shape), same stand-in approach as supplies' icon.
-    ("daily_stats", ar.SIDEBAR_DAILY_STATS, "reports", None, permissions.view_daily_stats),
+    # No dedicated icon asset exists yet for inventory/drawer -- reusing
+    # "expenses" (closest existing shape) rather than leaving the
+    # sidebar button iconless; swap for a real icon once one is
+    # rendered via tools/render_assets.py.
+    ("inventory", ar.SIDEBAR_INVENTORY, "expenses", None, permissions.manage_inventory),
+    ("drawer", ar.SIDEBAR_DRAWER, "expenses", None, permissions.view_drawer),
     ("expenses", ar.SIDEBAR_EXPENSES, "expenses", None, permissions.can_access_expenses),
     # No dedicated icon asset exists yet for supplies -- reusing "expenses"
     # (closest existing shape) rather than leaving the sidebar button

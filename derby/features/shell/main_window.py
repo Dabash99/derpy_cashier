@@ -15,6 +15,8 @@ from derby.features.auth import permissions
 from derby.features.closing.closing_banner import ClosingBannerWidget
 from derby.features.dashboard.daily_stats_screen import DailyStatsScreen
 from derby.features.expenses.expenses_screen import ExpensesScreen
+from derby.features.inventory.drawer_screen import DrawerScreen
+from derby.features.inventory.inventory_screen import InventoryScreen
 from derby.features.menu.menu_screen import MenuScreen
 from derby.features.playstation.playstation_screen import PlaystationScreen
 from derby.features.pos.pos_screen import PosScreen
@@ -111,6 +113,10 @@ class MainWindow(QMainWindow):
                 widget = ExpensesScreen(self._conn, self._user)
             elif key == "supplies":
                 widget = SuppliesScreen(self._conn, self._user)
+            elif key == "inventory":
+                widget = InventoryScreen(self._conn, self._user)
+            elif key == "drawer":
+                widget = DrawerScreen(self._conn, self._user)
             elif key == "reports":
                 widget = ReportsScreen(self._conn, self._user)
             else:
@@ -128,6 +134,11 @@ class MainWindow(QMainWindow):
             playstation_screen = self._screens.get("playstation")
             if playstation_screen is not None:
                 playstation_screen.order_opened.connect(self._on_order_opened_from_tables)
+
+        daily_stats_screen = self._screens.get("daily_stats")
+        if daily_stats_screen is not None:
+            daily_stats_screen.takeaway_requested.connect(self._on_takeaway_requested_from_tables)
+            daily_stats_screen.navigate_requested.connect(self._on_navigate)
 
     def _on_closing_changed(self) -> None:
         if self._closing_banner is not None:

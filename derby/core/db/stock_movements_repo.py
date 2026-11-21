@@ -60,3 +60,17 @@ def sum_qty_delta(conn: sqlite3.Connection, stock_item_id: int) -> float:
         "SELECT COALESCE(SUM(qty_delta), 0) AS total FROM stock_movements WHERE stock_item_id = ?", (stock_item_id,)
     ).fetchone()
     return row["total"]
+
+
+def sum_waste_cost_in_range(conn: sqlite3.Connection, start_date_iso: str, end_date_iso: str) -> int:
+    """Waste cost for a calendar-date range, read off created_at_utc's
+    date portion -- stock_movements has no business_date column (unlike
+    orders/expenses), so this is the plain UTC calendar day, not the
+    cafe's late-close business day. Close enough for a report figure;
+    see docs/PHASE9_REPORT.md for the caveat."""
+    row = conn.execute(
+        "SELECT COALESCE(SUM(-qty_delta * unit_cost_snapshot_piasters), 0) AS total FROM stock_movements "
+        "WHERE movement_type = 'waste' AND substr(created_at_utc, 1, 10) BETWEEN ? AND ?",
+        (start_date_iso, end_date_iso),
+    ).fetchone()
+    return int(round(row["total"]))

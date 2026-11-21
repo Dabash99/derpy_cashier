@@ -19,9 +19,10 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
-from derby.core.db import addons_repo
+from derby.core.db import addons_repo, recipes_repo
 from derby.core.i18n import ar
 from derby.core.utils.money import format_egp
+from derby.features.inventory.recipe_editor_dialog import RecipeEditorDialog
 from derby.features.menu.price_parsing import parse_product_price
 
 _ID_ROLE = 1000
@@ -58,6 +59,10 @@ class AddonGroupsPanel(QWidget):
         self._toggle_addon_button = QPushButton(ar.MENU_ADDON_GROUP_DEACTIVATE_BUTTON)
         self._toggle_addon_button.clicked.connect(self._on_toggle_addon_active)
         addons_column.addWidget(self._toggle_addon_button)
+
+        self._addon_recipe_button = QPushButton(ar.RECIPE_BUTTON)
+        self._addon_recipe_button.clicked.connect(self._on_edit_addon_recipe)
+        addons_column.addWidget(self._addon_recipe_button)
 
         outer.addLayout(addons_column, 2)
 
@@ -213,3 +218,16 @@ class AddonGroupsPanel(QWidget):
             return
         addons_repo.set_addon_active(self._conn, addon_id, not current["is_active"])
         self._reload_addons()
+
+    def _on_edit_addon_recipe(self) -> None:
+        addon_id = self._selected_addon_id()
+        if addon_id is None:
+            return
+        addons = {row["id"]: row for row in addons_repo.list_addons(self._conn, self._selected_group_id)}
+        addon = addons.get(addon_id)
+        if addon is None:
+            return
+        dialog = RecipeEditorDialog(
+            self._conn, recipes_repo.OWNER_ADDON, addon_id, addon["name"], addon["price_delta_piasters"], parent=self
+        )
+        dialog.exec_()

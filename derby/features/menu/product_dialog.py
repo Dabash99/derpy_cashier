@@ -28,9 +28,10 @@ from PySide2.QtWidgets import (
     QVBoxLayout,
 )
 
-from derby.core.db import addons_repo, audit_repo, categories_repo, products_repo
+from derby.core.db import addons_repo, audit_repo, categories_repo, products_repo, recipes_repo
 from derby.core.i18n import ar
 from derby.core.utils.money import piasters_to_plain_text
+from derby.features.inventory.recipe_editor_dialog import RecipeEditorDialog
 from derby.features.menu import images
 from derby.features.menu.price_parsing import parse_product_price
 
@@ -106,6 +107,15 @@ class ProductDialog(QDialog):
         self._active_checkbox.setChecked(True)
         form.addRow("", self._active_checkbox)
 
+        # A new, not-yet-saved product has no id for recipe_lines to point
+        # at -- the owner saves once, reopens to edit, and the button
+        # becomes available (same reasoning as image upload needing an
+        # existing row elsewhere in the app).
+        self._recipe_button = QPushButton(ar.RECIPE_BUTTON)
+        self._recipe_button.clicked.connect(self._on_edit_recipe)
+        self._recipe_button.setEnabled(self._product_id is not None)
+        form.addRow("", self._recipe_button)
+
         layout.addWidget(QLabel(ar.MENU_PRODUCT_ADDON_GROUPS_LABEL))
         self._groups_list = QListWidget()
         for group in addons_repo.list_groups(self._conn):
@@ -165,6 +175,18 @@ class ProductDialog(QDialog):
             self._image_preview.setPixmap(
                 pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             )
+
+    def _on_edit_recipe(self) -> None:
+        if self._product_id is None:
+            return
+        try:
+            price_piasters = parse_product_price(self._price_input.text())
+        except ValueError:
+            price_piasters = 0
+        dialog = RecipeEditorDialog(
+            self._conn, recipes_repo.OWNER_PRODUCT, self._product_id, self._name_ar_input.text(), price_piasters, parent=self
+        )
+        dialog.exec_()
 
     def _on_choose_image(self) -> None:
         file_path, _filter = QFileDialog.getOpenFileName(self, ar.MENU_PRODUCT_IMAGE_CHOOSE_BUTTON, "", _IMAGE_FILTER)
