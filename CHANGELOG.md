@@ -9,6 +9,25 @@
   الخزنة، النسخ الاحتياطي، ...) مع فلاتر بالتاريخ والمستخدم والعملية
   والخطورة، وتفاصيل قبل/بعد، وتصدير CSV/Excel. السجل لا يُحذف تلقائيًا
   أبدًا، ومحمي داخل قاعدة البيانات نفسها من أي تعديل أو حذف.
+- النسخ الاحتياطي: نسخة شهرية منفصلة عن اليومية، إعدادات جديدة (عدد
+  النسخ الشهرية، أيام التنبيه، نسخة إضافية كل N ساعة)، شاشة "عرض النسخ
+  الاحتياطية" تعرض كل نسخة بتاريخها وحجمها وإصدار البرنامج وقاعدة
+  البيانات وهل تم التحقق منها، وحذف يدوي للنسخ القديمة حسب السياسة.
+  مؤشر على الرئيسية لحالة آخر نسخة خارجية (سليمة/متأخرة/غير موجودة).
+- الورديات والموظفين: فتح/إغلاق وردية (مرتبطة بفتح/جرد الخزنة)، تسليم
+  وردية لمستخدم آخر في خطوة واحدة، تقرير وردية كامل (مبيعات حسب طريقة
+  الدفع، فواتير مبطلة، خصومات، مصروفات نقدية، الفرق في الخزنة). شاشة
+  الموظفين (إضافة/تعديل/تعطيل)، تسجيل حضور وانصراف، سلف واستقطاعات
+  وحوافز، وكشف رواتب شهري يسجّل الدفع كمصروف عادي.
+- العملاء والآجل: بيع بالآجل كطريقة دفع جديدة (لا يدخل في حساب الكاش في
+  الخزنة)، حد ائتمان اختياري يحتاج تجاوزه رقم سري المالك، تسجيل دفعات
+  العملاء (نقدي/إنستاباي)، كشف حساب بالرصيد المتراكم، تذكير واتساب،
+  وبطاقة على الرئيسية لإجمالي المستحق والمتأخر.
+- خصومات محفوظة (قابلة للاختيار عند الدفع مباشرة)، تنبيهات الرئيسية
+  (جلسة بلايستيشن طويلة، عملاء متأخرون، تأخر النسخة الخارجية، مخزون
+  ناقص، الدرج لم يُفتح، وردية مفتوحة من يوم سابق، فواتير موردين متأخرة)
+  قابلة للتعطيل كل واحدة على حدة، وقائمة إعادة الطلب من المخزون الناقص
+  مجمّعة حسب المورد مع كمية مقترحة، قابلة للنسخ كنص.
 
 ### English
 
@@ -18,6 +37,29 @@
   before/after detail, and CSV/Excel export. The log is never
   auto-deleted and is protected at the database level against any
   update or delete.
+- Backups: a separate monthly snapshot tier alongside the daily one,
+  new settings (monthly keep count, warning days, an optional extra
+  backup every N hours), a "عرض النسخ الاحتياطية" screen listing every
+  backup with its date/size/app version/schema version/verified flag,
+  and a manual "delete old backups per policy" action. A home-screen
+  indicator shows the external backup's health (ok/warning/missing).
+- Shifts & employees: open/close a shift (tied to the existing drawer
+  open/count), a one-step handover to another user, a full shift
+  report (sales by payment method, voids, discounts, cash expenses,
+  drawer difference). An employees screen, clock in/out, advances/
+  deductions/bonuses, and a monthly payroll sheet whose "record payment"
+  files an ordinary expense.
+- Customers & credit (آجل): a new credit payment method (never counted
+  as cash in the drawer), an optional credit limit that needs the
+  owner's PIN to exceed, recording customer payments (cash/InstaPay), a
+  running-balance statement, a WhatsApp reminder, and a home-screen tile
+  for total/overdue receivables.
+- Saved discount presets (selectable directly at checkout), a home-
+  screen alerts center (long PS sessions, overdue customers, overdue
+  external backup, low stock, drawer not opened, a shift left open,
+  overdue supplier invoices) with a per-type on/off setting, and a
+  reorder list built from low-stock items, grouped by supplier with a
+  suggested quantity, copyable as plain text.
 
 ## 1.1.0 — 2026-11-22
 

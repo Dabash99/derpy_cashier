@@ -213,6 +213,45 @@ tests/                      106 ملف اختبار، 708 دالة test_*
 
 انظر القسم 7 بالتفصيل.
 
+### إضافات Phase 11 (قيد التطوير، غير مُصدرة بعد)
+
+أقسام جديدة في الشريط الجانبي، كل واحد محمي بدالة صلاحية من
+`permissions.py` (انظر `tests/test_phase11_cross_cutting.py` لكل
+مفاتيح الصلاحيات الجديدة):
+
+- **سجل العمليات** (`audit_log` → `AuditLogScreen`, مالك فقط): جدول
+  `audit_log` (migration 0012) أصبح append-only فعليًا (triggers تمنع
+  UPDATE/DELETE)، بأعمدة جديدة (business_date, user_name, entity_type/
+  id, summary_ar, details_json, severity). كل الخدمات تكتب إليه عبر
+  `derby/core/audit_service.py` (لا UI يكتب مباشرة)، وفشل الكتابة لا
+  يوقف أبدًا العملية التجارية نفسها.
+- **النسخ الاحتياطي** (داخل الإعدادات، migration 0013): طبقة نسخ شهرية
+  منفصلة (`backup_service.maybe_create_monthly_snapshot`)، إعدادات
+  retention/warning/auto-hours جديدة، `BackupsListDialog` (عرض كل نسخة
+  بإصدار البرنامج/القاعدة والتحقق)، ومؤشر صحة على الرئيسية
+  (`backup_service.external_backup_status`).
+- **الورديات والموظفين** (`shifts_employees`): جداول `shifts`،
+  `employees`، `attendance`، `payroll_lines`، `payroll_payments`
+  (migration 0014). تقرير الوردية (`shift_service.build_shift_report`)
+  يُحسب من النافذة الزمنية الحقيقية للوردية (مش من عمود `shift_id` على
+  كل صف) فيغطي كل مسارات الكتابة تلقائيًا. دفع الرواتب يعيد استخدام
+  `expenses_service` (فئة "مرتبات" جديدة).
+- **العملاء** (`customers`): جدولا `customers` و`customer_ledger`
+  (append-only بالاتفاق، migration 0015). البيع بالآجل = فاتورة مدفوعة
+  بـ `payment_method = NULL` و`customer_id` محدد (لم يُوسَّع قيد
+  CHECK على `payment_method`). دفعة عميل نقدية تُسجَّل في جدول جديد
+  `extra_drawer_entries` (نفس السبب: CHECK على `drawer_entries.
+  entry_type`)، ويُجمع هذا الجدول مع `drawer_entries` بالتوقيت الزمني
+  عند حساب الكاش المتوقع (`drawer_service.expected_cash_piasters`).
+- **الإضافات** (migration 0016): `discount_presets`، إعدادات تنبيهات
+  الرئيسية (`derby/features/dashboard/alerts_service.py` — كل تنبيه
+  بدالة صغيرة معزولة بـ try/except خاص بيه)، وعمود `stock_items.
+  target_qty` لقائمة إعادة الطلب (`derby/features/inventory/
+  reorder_service.py`، يجمع حسب آخر مورد اشتُري منه كل عنصر بدل عمود
+  مورد ثابت).
+
+تقرير التفاصيل الكامل: [`docs/PHASE11_REPORT.md`](PHASE11_REPORT.md).
+
 ---
 
 ## 4) القواعد التجارية (business rules)
