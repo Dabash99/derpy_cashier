@@ -31,6 +31,7 @@ from derby.features.inventory.inventory_dialogs import (
     SupplierDialog,
     WasteDialog,
 )
+from derby.features.inventory.reorder_list_dialog import ReorderListDialog
 from derby.features.reports.export_panel import ExportPanel
 from derby.features.reports.export_service import (
     export_purchases_csv,
@@ -68,10 +69,16 @@ class InventoryScreen(QWidget):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
+        top_row = QHBoxLayout()
         add_button = QPushButton(ar.INVENTORY_ADD_ITEM_BUTTON)
         add_button.setProperty("variant", "primary")
         add_button.clicked.connect(self._on_add_item)
-        layout.addWidget(add_button)
+        top_row.addWidget(add_button)
+        reorder_button = QPushButton(ar.REORDER_LIST_TITLE)
+        reorder_button.clicked.connect(self._on_open_reorder_list)
+        top_row.addWidget(reorder_button)
+        top_row.addStretch(1)
+        layout.addLayout(top_row)
 
         self._stock_table = QTableWidget(0, 7)
         self._stock_table.setHorizontalHeaderLabels(
@@ -134,6 +141,9 @@ class InventoryScreen(QWidget):
         dialog = StockItemDialog(self._conn, parent=self)
         if dialog.exec_() == QDialog.Accepted:
             self.reload()
+
+    def _on_open_reorder_list(self) -> None:
+        ReorderListDialog(self._conn, parent=self).exec_()
 
     def _on_edit_item(self, item: sqlite3.Row) -> None:
         dialog = StockItemDialog(self._conn, item, parent=self)

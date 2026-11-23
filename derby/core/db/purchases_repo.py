@@ -61,6 +61,27 @@ def list_purchases(
     ).fetchall()
 
 
+def last_supplier_name_for_stock_item(conn: sqlite3.Connection, stock_item_id: int) -> Optional[str]:
+    """The supplier of the most recent purchase that included this stock
+    item -- stock_items has no fixed supplier column (Phase 9 never
+    needed one); the reorder list (Phase 11 Part E) infers "who do we
+    usually buy this from" this way instead of adding one, since a
+    purchase already links a supplier to the items on it."""
+    row = conn.execute(
+        """
+        SELECT s.name AS name
+        FROM purchase_lines pl
+        JOIN purchases p ON p.id = pl.purchase_id
+        LEFT JOIN suppliers s ON s.id = p.supplier_id
+        WHERE pl.stock_item_id = ?
+        ORDER BY p.purchase_date DESC, p.id DESC
+        LIMIT 1
+        """,
+        (stock_item_id,),
+    ).fetchone()
+    return row["name"] if row is not None else None
+
+
 def mark_paid(conn: sqlite3.Connection, purchase_id: int, expense_id: int, commit: bool = True) -> None:
     conn.execute("UPDATE purchases SET is_paid = 1, expense_id = ? WHERE id = ?", (expense_id, purchase_id))
     if commit:
