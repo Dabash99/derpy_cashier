@@ -42,7 +42,12 @@ class AlertsSettingsPanel(QWidget):
             self._checkboxes[key] = checkbox
             layout.addWidget(checkbox)
 
-        form = QFormLayout()
+        # The form lives inside its OWN QWidget container, not a bare
+        # QFormLayout handed straight to the outer QVBoxLayout -- see
+        # shift_panel.py's comment on the same fix for the same bug
+        # class (confirmed by tests/test_ui_sweep.py).
+        form_host = QWidget()
+        form = QFormLayout(form_host)
         self._ps_hours_input = QSpinBox()
         self._ps_hours_input.setRange(1, 24)
         form.addRow("ساعات جلسة البلايستيشن الطويلة", self._ps_hours_input)
@@ -52,7 +57,7 @@ class AlertsSettingsPanel(QWidget):
         self._supplier_days_input = QSpinBox()
         self._supplier_days_input.setRange(1, 90)
         form.addRow("أيام تأخر فاتورة المورد", self._supplier_days_input)
-        layout.addLayout(form)
+        layout.addWidget(form_host)
 
         save_button = QPushButton(ar.GENERIC_SAVE)
         save_button.clicked.connect(self._on_save)

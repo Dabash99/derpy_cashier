@@ -786,6 +786,7 @@ ALERT_DRAWER_NOT_OPENED = "الدرج لم يُفتح اليوم بعد"
 ALERT_SHIFT_LEFT_OPEN = "توجد وردية مفتوحة من يوم سابق"
 ALERT_UNPAID_SUPPLIER_INVOICES = "{count} فاتورة مورد غير مدفوعة من أكثر من {days} يوم"
 ALERTS_SETTINGS_TITLE = "إعدادات التنبيهات"
+SETTINGS_TAB_EXTRAS = "الخصومات والتنبيهات"
 
 REORDER_LIST_TITLE = "قائمة إعادة الطلب"
 REORDER_LIST_COLUMN_SUPPLIER = "المورد"
