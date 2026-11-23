@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Dict, Iterable
 
 from PySide2.QtCore import Qt
+from PySide2.QtGui import QBrush, QColor
 from PySide2.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
 
 from derby.core.theme import tokens
@@ -88,4 +89,15 @@ def centered_item(text: str) -> QTableWidgetItem:
     badge) -- centered rather than hugging either edge."""
     item = QTableWidgetItem(text)
     item.setTextAlignment(int(Qt.AlignCenter))
+    return item
+
+
+def mark_as_danger(item: QTableWidgetItem) -> QTableWidgetItem:
+    """Recolors a cell's text (a critical audit-log row, an overdue
+    customer, ...) to the brand's danger color. QTableWidgetItem is NOT
+    a QWidget/QObject -- it has no setProperty()/stylesheet [role=...]
+    support, unlike every QLabel elsewhere in this app, so this sets the
+    foreground brush directly instead. Returns the same item, so this
+    can wrap a right_item(...)/centered_item(...) call inline."""
+    item.setForeground(QBrush(QColor(tokens.DANGER)))
     return item

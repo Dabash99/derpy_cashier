@@ -19,7 +19,7 @@ from PySide2.QtWidgets import (
 from derby.core.db import customer_ledger_repo, customers_repo, settings_repo
 from derby.core.i18n import ar
 from derby.core.integrations import whatsapp
-from derby.core.theme.table_style import centered_item, configure_table, right_item
+from derby.core.theme.table_style import centered_item, configure_table, mark_as_danger, right_item
 from derby.core.utils.money import format_egp, parse_egp_input
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo, utc_now
 from derby.features.customers import customer_service
@@ -136,7 +136,7 @@ class CustomersScreen(QWidget):
             for column, (value, make_item) in enumerate(zip(values, makers)):
                 item = make_item(value)
                 if overdue:
-                    item.setProperty("role", "error")
+                    item = mark_as_danger(item)
                 self._table.setItem(row_index, column, item)
 
     def _on_selection_changed(self, row: int, *_args) -> None:

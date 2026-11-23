@@ -24,7 +24,7 @@ from PySide2.QtWidgets import (
 
 from derby.core.db import audit_repo, users_repo
 from derby.core.i18n import ar
-from derby.core.theme.table_style import centered_item, configure_table, right_item
+from derby.core.theme.table_style import centered_item, configure_table, mark_as_danger, right_item
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo, utc_now
 from derby.features.audit.action_labels import label_for_action
 from derby.features.audit.audit_detail_dialog import AuditDetailDialog
@@ -186,7 +186,7 @@ class AuditLogScreen(QWidget):
         for column, (value, make_item) in enumerate(zip(values, makers)):
             item = make_item(value)
             if entry["severity"] == "critical":
-                item.setProperty("role", "error")
+                item = mark_as_danger(item)
             self._table.setItem(row, column, item)
 
     def _on_prev_page(self) -> None:
