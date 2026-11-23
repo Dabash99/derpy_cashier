@@ -88,6 +88,12 @@ class InventoryScreen(QWidget):
             ]
         )
         configure_table(self._stock_table, stretch_columns=(0,), fixed_widths={6: 400})
+        # Four action buttons share this row; QPushButton's natural height
+        # (padding + Cairo font metrics) exceeds the app-wide row height,
+        # which silently clips the tops/bottoms of their Arabic glyphs --
+        # taller rows just for this table, not a global token change.
+        self._stock_table.verticalHeader().setDefaultSectionSize(64)
+        self._stock_table.verticalHeader().setMinimumSectionSize(64)
         layout.addWidget(self._stock_table)
 
         self._stock_export_panel = ExportPanel(lambda: "المخزون_{0}".format(utc_now().strftime("%Y%m%d")))
