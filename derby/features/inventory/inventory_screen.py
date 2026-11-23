@@ -80,7 +80,7 @@ class InventoryScreen(QWidget):
                 ar.INVENTORY_COLUMN_AVG_COST, ar.INVENTORY_COLUMN_VALUE, ar.INVENTORY_COLUMN_STATUS, "",
             ]
         )
-        configure_table(self._stock_table, stretch_columns=(0,), fixed_widths={6: 260})
+        configure_table(self._stock_table, stretch_columns=(0,), fixed_widths={6: 400})
         layout.addWidget(self._stock_table)
 
         self._stock_export_panel = ExportPanel(lambda: "المخزون_{0}".format(utc_now().strftime("%Y%m%d")))
@@ -113,6 +113,7 @@ class InventoryScreen(QWidget):
             actions = QWidget()
             actions_layout = QHBoxLayout(actions)
             actions_layout.setContentsMargins(0, 0, 0, 0)
+            actions_layout.setSpacing(4)
             edit_button = QPushButton(ar.INVENTORY_EDIT_BUTTON)
             edit_button.clicked.connect(lambda _c=False, i=item: self._on_edit_item(i))
             actions_layout.addWidget(edit_button)
