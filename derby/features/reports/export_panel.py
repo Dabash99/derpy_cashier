@@ -24,6 +24,7 @@ class ExportPanel(QWidget):
         self._exporters = {}  # extension -> (dialog_filter, export_fn(path))
         self._last_folder: Path = None
         self._worker: ExportWorker = None
+        self._before_export_fn: Callable[[], None] = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -48,14 +49,26 @@ class ExportPanel(QWidget):
         self._open_folder_button.clicked.connect(self._on_open_folder)
         layout.addWidget(self._open_folder_button)
 
-    def set_exporters(self, csv_fn=None, xlsx_fn=None, pdf_fn=None) -> None:
-        """Each fn takes one argument (the destination Path) and writes the file."""
+    def set_exporters(self, csv_fn=None, xlsx_fn=None, pdf_fn=None, before_export_fn=None) -> None:
+        """Each fn takes one argument (the destination Path) and writes the
+        file; they run on a background thread, so they must only touch
+        plain in-memory data, never the sqlite3 connection directly (see
+        reports_screen.py: self._report is fetched on the main thread at
+        reload() time, not inside _export_csv). `before_export_fn`, if
+        given, runs synchronously on the MAIN thread right before the
+        worker starts -- for a screen whose export set (e.g. "every row
+        matching the current filters", not just the current page) must
+        be queried fresh at export time rather than kept from reload().
+        """
         self._exporters = {"csv": csv_fn, "xlsx": xlsx_fn, "pdf": pdf_fn}
+        self._before_export_fn = before_export_fn
 
     def _on_export_clicked(self, extension: str) -> None:
         export_fn = self._exporters.get(extension)
         if export_fn is None:
             return
+        if self._before_export_fn is not None:
+            self._before_export_fn()
         export_dir = default_export_dir()
         export_dir.mkdir(parents=True, exist_ok=True)
         suggested = str(export_dir / "{0}.{1}".format(self._default_filename_stem(), extension))

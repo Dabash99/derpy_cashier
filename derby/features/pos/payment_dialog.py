@@ -10,6 +10,7 @@ from PySide2.QtWidgets import QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButt
 
 from derby.core.i18n import ar
 from derby.core.utils.money import format_egp
+from derby.features.customers.credit_sale_dialog import CreditSaleDialog
 from derby.features.menu.price_parsing import parse_product_price
 from derby.features.pos import orders_service
 from derby.features.pos.exceptions import SessionRunningError
@@ -53,6 +54,10 @@ class PaymentDialog(QDialog):
         instapay_button.setProperty("variant", "primary")
         instapay_button.clicked.connect(lambda: self._on_pay("instapay"))
         buttons_row.addWidget(instapay_button)
+
+        credit_button = QPushButton(ar.PAYMENT_METHOD_CREDIT)
+        credit_button.clicked.connect(self._on_credit)
+        buttons_row.addWidget(credit_button)
         layout.addLayout(buttons_row)
 
         self._error_label = QLabel("")
@@ -79,3 +84,9 @@ class PaymentDialog(QDialog):
             self._error_label.setText(ar.PS_ERROR_SESSION_RUNNING)
             return
         self.accept()
+
+    def _on_credit(self) -> None:
+        dialog = CreditSaleDialog(self._conn, self._order, self._requesting_user, parent=self)
+        if dialog.exec_() == QDialog.Accepted and dialog.paid_order is not None:
+            self.paid_order = dialog.paid_order
+            self.accept()

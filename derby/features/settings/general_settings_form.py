@@ -7,18 +7,27 @@ import sqlite3
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QFormLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget
 
+from derby.core import audit_service
 from derby.core.db import settings_repo
 from derby.core.i18n import ar
 
 _CLOSE_TIME_PATTERN = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
+_AUDITED_KEYS = (
+    ("cafe_name", ar.SETTINGS_CAFE_NAME_LABEL),
+    ("business_close_time", ar.SETTINGS_CLOSE_TIME_LABEL),
+    ("ps_min_minutes", ar.SETTINGS_PS_MIN_MINUTES_LABEL),
+    ("rounding_step_egp", ar.SETTINGS_ROUNDING_STEP_LABEL),
+    ("auto_lock_minutes", ar.SETTINGS_AUTO_LOCK_LABEL),
+)
 
 
 class GeneralSettingsForm(QWidget):
     saved = Signal()
 
-    def __init__(self, conn: sqlite3.Connection, parent: QWidget = None) -> None:
+    def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row = None, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
+        self._user = user
         self._build_ui()
         self.reload()
 
@@ -75,11 +84,21 @@ class GeneralSettingsForm(QWidget):
             self._error_label.setText(ar.SETTINGS_ERROR_INVALID_TIME)
             return
 
+        before = settings_repo.get_all(self._conn)
         settings_repo.set_value(self._conn, "cafe_name", self._cafe_name_input.text().strip())
         settings_repo.set_value(self._conn, "business_close_time", close_time_text)
         settings_repo.set_value(self._conn, "ps_min_minutes", str(self._ps_min_minutes_input.value()))
         settings_repo.set_value(self._conn, "rounding_step_egp", str(self._rounding_step_input.value()))
         settings_repo.set_value(self._conn, "auto_lock_minutes", str(self._auto_lock_input.value()))
+        after = settings_repo.get_all(self._conn)
+
+        changed = {key: {"before": before[key], "after": after[key]} for key, _label in _AUDITED_KEYS if before.get(key) != after.get(key)}
+        if changed:
+            audit_service.log(
+                self._conn, "settings_changed", user=self._user, entity_type="settings",
+                summary_ar="تغيير إعدادات عامة: {0}".format(", ".join(changed.keys())),
+                details=changed,
+            )
 
         self._error_label.setText("")
         self.saved.emit()

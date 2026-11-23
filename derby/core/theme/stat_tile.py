@@ -31,5 +31,14 @@ class StatTile(QWidget):
         caption.setWordWrap(True)
         layout.addWidget(caption)
 
-    def set_value(self, value_text: str) -> None:
+    def set_value(self, value_text: str, role: str = "title") -> None:
+        """`role` lets a tile whose number IS a status (e.g. "آخر نسخة
+        خارجية": سليمة/متأخرة/غير موجودة) recolor itself like any other
+        QLabel[role=...] -- green/amber/red -- instead of always being
+        plain title-colored; every numeric/money tile just keeps the
+        default "title" role."""
         self._value_label.setText(value_text)
+        if self._value_label.property("role") != role:
+            self._value_label.setProperty("role", role)
+            self._value_label.style().unpolish(self._value_label)
+            self._value_label.style().polish(self._value_label)

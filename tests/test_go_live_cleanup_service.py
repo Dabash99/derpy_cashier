@@ -102,9 +102,11 @@ def test_cleanup_wipes_operational_tables_and_keeps_everything_else(populated):
 
     for table in _OPERATIONAL_TABLES:
         assert _row_count(conn, table) == 0
-    audit_rows = conn.execute("SELECT action FROM audit_log").fetchall()
-    assert len(audit_rows) == 1
-    assert audit_rows[0]["action"] == "go_live_cleanup"
+    # audit_log is append-only (Phase 11): the cleanup no longer wipes it,
+    # it only adds its own "go_live_cleanup" row on top of whatever the
+    # test period already produced.
+    audit_rows = conn.execute("SELECT action FROM audit_log ORDER BY id").fetchall()
+    assert audit_rows[-1]["action"] == "go_live_cleanup"
 
     assert settings_repo.get(conn, "next_invoice_no") == "1"
     assert users_repo.list_users(conn) == kept_users_before

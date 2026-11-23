@@ -10,14 +10,16 @@ from PySide2.QtWidgets import (
     QComboBox,
     QDialog,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QVBoxLayout,
 )
 
-from derby.core.db import users_repo
+from derby.core.db import discount_presets_repo, users_repo
 from derby.core.i18n import ar
+from derby.core.utils.money import piasters_to_plain_text
 from derby.features.menu.price_parsing import parse_product_price
 from derby.features.pos import orders_service
 from derby.features.pos.discount_math import DISCOUNT_KIND_FIXED, DISCOUNT_KIND_PERCENT
@@ -35,11 +37,23 @@ class DiscountDialog(QDialog):
         self._conn = conn
         self._order_id = order_id
         self._requesting_user = requesting_user
+        self._used_preset_name = None
         self.setWindowTitle(ar.DISCOUNT_DIALOG_TITLE)
         self._build_ui()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+
+        presets = discount_presets_repo.list_presets(self._conn, active_only=True)
+        if presets:
+            layout.addWidget(QLabel(ar.DISCOUNT_PRESETS_LABEL))
+            presets_row = QHBoxLayout()
+            for preset in presets:
+                button = QPushButton(preset["name"])
+                button.clicked.connect(lambda _c=False, p=preset: self._on_use_preset(p))
+                presets_row.addWidget(button)
+            layout.addLayout(presets_row)
+
         form = QFormLayout()
         layout.addLayout(form)
 
@@ -72,6 +86,18 @@ class DiscountDialog(QDialog):
         remove_button.clicked.connect(self._on_remove)
         layout.addWidget(remove_button)
 
+    def _on_use_preset(self, preset) -> None:
+        index = self._kind_input.findData(preset["kind"])
+        if index >= 0:
+            self._kind_input.setCurrentIndex(index)
+        if preset["kind"] == DISCOUNT_KIND_PERCENT:
+            self._amount_input.setText(str(preset["amount"]))
+        else:
+            self._amount_input.setText(piasters_to_plain_text(preset["amount"]))
+        if not self._reason_input.text().strip():
+            self._reason_input.setText(preset["name"])
+        self._used_preset_name = preset["name"]
+
     def _on_apply(self) -> None:
         kind = self._kind_input.currentData()
         try:
@@ -92,6 +118,7 @@ class DiscountDialog(QDialog):
                 self._reason_input.text(),
                 self._requesting_user,
                 approving_pin=self._pin_input.text(),
+                preset_name=self._used_preset_name,
             )
         except DiscountReasonRequiredError:
             self._error_label.setText(ar.DISCOUNT_ERROR_REASON_REQUIRED)

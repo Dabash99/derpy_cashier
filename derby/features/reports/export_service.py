@@ -72,6 +72,7 @@ def report_sections(report: ReportResult) -> List[ExportSection]:
         [
             ["نقدي", report.payment_methods["cash"].count, report.payment_methods["cash"].total_piasters],
             ["إنستاباي", report.payment_methods["instapay"].count, report.payment_methods["instapay"].total_piasters],
+            ["آجل", report.payment_methods["credit"].count, report.payment_methods["credit"].total_piasters],
         ],
         money_columns=(2,),
     )
@@ -199,6 +200,31 @@ def purchases_sections(purchases, supplier_name_by_id) -> List[ExportSection]:
     ]
     section = ExportSection(
         "المشتريات", ["التاريخ", "المورد", "الإجمالي (ج.م)", "الحالة"], rows, money_columns=(2,)
+    )
+    return [section]
+
+
+def audit_log_sections(entries) -> List[ExportSection]:
+    from derby.features.audit.action_labels import (
+        label_for_action,  # local import: audit is a separate feature
+    )
+
+    rows = [
+        [
+            entry["at_utc"][:16].replace("T", " "),
+            entry["business_date"] or "",
+            entry["user_name"] or "",
+            label_for_action(entry["action"]),
+            "{0} #{1}".format(entry["entity_type"], entry["entity_id"]) if entry["entity_type"] else "",
+            entry["summary_ar"] or entry["details"] or "",
+            entry["severity"],
+        ]
+        for entry in entries
+    ]
+    section = ExportSection(
+        "سجل العمليات",
+        ["الوقت (UTC)", "يوم العمل", "المستخدم", "العملية", "العنصر", "الوصف", "الخطورة"],
+        rows,
     )
     return [section]
 

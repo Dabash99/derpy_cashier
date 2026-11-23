@@ -44,7 +44,7 @@ from derby.features.reports import report_service
 from derby.features.reports.export_panel import ExportPanel
 from derby.features.reports.export_service import export_report_csv, export_report_pdf, export_report_xlsx
 
-_PAYMENT_METHOD_LABELS = {"cash": "نقدي", "instapay": "إنستاباي"}
+_PAYMENT_METHOD_LABELS = {"cash": "نقدي", "instapay": "إنستاباي", "credit": ar.PAYMENT_METHOD_CREDIT}
 
 
 def _month_bounds(year_month: str):

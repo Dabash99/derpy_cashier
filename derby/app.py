@@ -9,13 +9,14 @@ scheduler and an exit-time backup safety net run independently of login.
 from __future__ import annotations
 
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 from PySide2.QtCore import QEventLoop, Qt, QTimer
 from PySide2.QtGui import QFont, QIcon
 from PySide2.QtWidgets import QApplication, QDialog, QLabel, QMessageBox, QStackedWidget, QVBoxLayout
 
-from derby.core.db import audit_repo, settings_repo, users_repo
+from derby.core.db import audit_repo, backup_log_repo, settings_repo, users_repo
 from derby.core.db import migrations as migrations_module
 from derby.core.db.connection import connect
 from derby.core.db.migrations import run_pending_migrations
@@ -27,7 +28,7 @@ from derby.core.utils import error_log, platform_info
 from derby.core.utils.paths import app_data_dir, database_path, default_backup_dir
 from derby.core.utils.single_instance import SingleInstanceGuard
 from derby.core.utils.startup_cache import clear_cache_once_after_1_0_0_upgrade
-from derby.core.utils.time_utils import utc_now
+from derby.core.utils.time_utils import parse_utc_iso, utc_now
 from derby.features.auth.login_screen import LoginScreen
 from derby.features.auth.setup_screen import SetupScreen
 from derby.features.closing import backup_service, closing_service, restore_service
@@ -119,6 +120,36 @@ class AppController:
 
     def _on_scheduler_tick(self) -> None:
         self._run_closing(trigger="auto")
+        self._maybe_run_auto_hours_backup()
+
+    def _maybe_run_auto_hours_backup(self) -> None:
+        """Part B: an owner-set "نسخة إضافية كل N ساعات" (settings.
+        backup_auto_hours, 0 = disabled) -- an extra manual-style backup
+        between daily closings, for a cafe open long hours where waiting
+        for the next day's close would risk losing too much. Silent (no
+        dialog): it either succeeds quietly or is retried on the next
+        30s tick, same as the daily-closing scheduler right above it."""
+        if self._closing_worker is not None and self._closing_worker.isRunning():
+            return
+        values = settings_repo.get_all(self._conn)
+        auto_hours = int(values.get("backup_auto_hours") or "0")
+        if auto_hours <= 0:
+            return
+        primary_text = values["backup_folder_primary"].strip()
+        if not primary_text:
+            return
+        last = backup_log_repo.last_verified_backup(self._conn, "primary")
+        if last is not None and (utc_now() - parse_utc_iso(last["at_utc"])) < timedelta(hours=auto_hours):
+            return
+        primary_dir = Path(primary_text)
+        secondary_text = values["backup_folder_secondary"].strip()
+        secondary_dir = Path(secondary_text) if secondary_text else None
+
+        def work(worker_conn):
+            return closing_service.run_manual_backup(worker_conn, self._db_path, utc_now(), primary_dir, secondary_dir)
+
+        self._closing_worker = ClosingWorker(self._db_path, work)
+        self._closing_worker.start()
 
     def _run_closing(self, trigger: str) -> None:
         if self._closing_worker is not None and self._closing_worker.isRunning():
@@ -150,7 +181,8 @@ class AppController:
         if not closing_service.exit_backup_is_due(self._conn, utc_now()):
             return
         enabled, primary_dir, secondary_dir, keep_count, _cafe_name = self._closing_settings()
-        if not enabled or primary_dir is None:
+        backup_on_exit_enabled = settings_repo.get(self._conn, "backup_on_exit_enabled", "1") == "1"
+        if not enabled or not backup_on_exit_enabled or primary_dir is None:
             return
 
         progress_dialog = QDialog()

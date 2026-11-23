@@ -136,3 +136,69 @@ def view_cost_data(role: str) -> bool:
     """cost_at_sale_piasters / recipe cost+margin, anywhere it would show
     in the UI (invoice line, recipe editor) -- owner only."""
     return role == ROLE_OWNER
+
+
+# --- Phase 11 ------------------------------------------------------------
+
+
+def view_audit_log(role: str) -> bool:
+    """سجل العمليات -- owner only, same privacy class as view_reports."""
+    return role == ROLE_OWNER
+
+
+def manage_backups(role: str) -> bool:
+    """النسخ الاحتياطي settings/actions -- owner only."""
+    return role == ROLE_OWNER
+
+
+def manage_employees(role: str) -> bool:
+    """Employee records, payroll, advances/deductions/bonuses -- owner only."""
+    return role == ROLE_OWNER
+
+
+def view_shift_report(role: str) -> bool:
+    """Both roles open/close their own shift; the full report (sales by
+    method, discounts, voids) is shown to whoever closes it."""
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def manage_shifts_all(role: str) -> bool:
+    """Viewing every shift (not just one's own open one) -- owner only."""
+    return role == ROLE_OWNER
+
+
+def clock_in_out(role: str) -> bool:
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def manage_attendance_corrections(role: str) -> bool:
+    return role == ROLE_OWNER
+
+
+def manage_customers(role: str) -> bool:
+    return role == ROLE_OWNER
+
+
+def sell_on_credit(role: str, cashiers_may_sell_on_credit: bool) -> bool:
+    """Owner can always sell on آجل; a cashier only if the setting allows
+    it (CLAUDE.md Part D: "Setting: whether cashiers may sell on
+    credit")."""
+    if role == ROLE_OWNER:
+        return True
+    return role == ROLE_CASHIER and cashiers_may_sell_on_credit
+
+
+def record_customer_payment(role: str) -> bool:
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def view_customers(role: str) -> bool:
+    return role in (ROLE_OWNER, ROLE_CASHIER)
+
+
+def manage_discount_presets(role: str) -> bool:
+    return role == ROLE_OWNER
+
+
+def manage_alerts_settings(role: str) -> bool:
+    return role == ROLE_OWNER

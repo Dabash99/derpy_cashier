@@ -33,10 +33,12 @@ def _day_section(day_report: ReportResult, top_items_limit: int, show_ps_detail:
     lines.append("إجمالي المبيعات: {0}".format(format_egp(day_report.net_sales_piasters)))
     cash = day_report.payment_methods.get("cash")
     instapay = day_report.payment_methods.get("instapay")
+    credit = day_report.payment_methods.get("credit")
     if cash is not None and instapay is not None:
-        lines.append(
-            "نقدي: {0} — إنستاباي: {1}".format(format_egp(cash.total_piasters), format_egp(instapay.total_piasters))
-        )
+        payment_line = "نقدي: {0} — إنستاباي: {1}".format(format_egp(cash.total_piasters), format_egp(instapay.total_piasters))
+        if credit is not None and credit.total_piasters:
+            payment_line += " — آجل: {0}".format(format_egp(credit.total_piasters))
+        lines.append(payment_line)
     if day_report.discount_total_piasters:
         lines.append("الخصومات: {0}".format(format_egp(day_report.discount_total_piasters)))
 

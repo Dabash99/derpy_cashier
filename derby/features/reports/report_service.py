@@ -46,7 +46,7 @@ from derby.features.pos.orders_service import is_from_previous_business_day
 # purchase cost is already counted through COGS (cost_at_sale_piasters).
 SUPPLIES_EXPENSE_CATEGORY_NAME = "مشتريات"
 
-PAYMENT_METHODS = ("cash", "instapay")
+PAYMENT_METHODS = ("cash", "instapay", "credit")
 
 
 @dataclass
@@ -287,7 +287,11 @@ def build_report(
 
     payment_methods = {method: PaymentMethodTotal() for method in PAYMENT_METHODS}
     for order in paid_orders:
-        stat = payment_methods.get(order["payment_method"])
+        # آجل (credit) sales leave payment_method NULL and set customer_id
+        # instead (see orders_repo.mark_order_paid_on_credit) -- never a
+        # third value in the CHECK-constrained payment_method column.
+        method_key = "credit" if order["customer_id"] else order["payment_method"]
+        stat = payment_methods.get(method_key)
         if stat is not None:
             stat.total_piasters += order["total_piasters"]
             stat.count += 1

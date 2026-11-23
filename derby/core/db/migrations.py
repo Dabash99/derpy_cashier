@@ -713,6 +713,348 @@ def _migration_0011_drawer_entries_is_historical_repair(conn: sqlite3.Connection
     conn.execute("UPDATE drawer_entries SET is_historical = 1")
 
 
+def _migration_0012_audit_log_v2(conn: sqlite3.Connection) -> None:
+    """Phase 11 Part A: audit_log (created bare in migration 0001, used
+    ever since via audit_repo.log for a handful of events) grows the
+    columns a real "سجل العمليات" screen needs -- business_date, a
+    snapshot of the acting user's name (so a later deactivation/rename
+    never changes how an old entry reads), entity linking, a short
+    Arabic summary, a structured before/after details_json blob, and a
+    severity flag -- plus the indexes a filtered, paged screen needs and
+    the two triggers that make it genuinely append-only at the DB level
+    (belt-and-braces alongside every repo/service only ever INSERTing
+    into it). Existing rows are backfilled with a best-effort
+    business_date (same business_date() + business_close_time rule every
+    other backfill in this file uses) and a user_name snapshot from the
+    users table as it stands today; they get severity='info' (already
+    the column default) and NULL entity/summary/details_json, which the
+    screen must render gracefully -- never a crash on an old row.
+    """
+    conn.execute("ALTER TABLE audit_log ADD COLUMN business_date TEXT")
+    conn.execute("ALTER TABLE audit_log ADD COLUMN user_name TEXT")
+    conn.execute("ALTER TABLE audit_log ADD COLUMN entity_type TEXT")
+    conn.execute("ALTER TABLE audit_log ADD COLUMN entity_id INTEGER")
+    conn.execute("ALTER TABLE audit_log ADD COLUMN summary_ar TEXT")
+    conn.execute("ALTER TABLE audit_log ADD COLUMN details_json TEXT")
+    conn.execute("ALTER TABLE audit_log ADD COLUMN severity TEXT NOT NULL DEFAULT 'info'")
+
+    close_time_row = conn.execute("SELECT value FROM settings WHERE key = 'business_close_time'").fetchone()
+    close_time_value = close_time_row["value"] if close_time_row is not None else "23:59"
+    hour_str, minute_str = (close_time_value or "23:59").split(":")
+    close_time = time_of_day(int(hour_str), int(minute_str))
+
+    for row in conn.execute("SELECT id, at_utc, user_id FROM audit_log WHERE business_date IS NULL").fetchall():
+        business_date_value = _compute_business_date(_parse_utc_iso(row["at_utc"]), close_time).isoformat()
+        user_name = None
+        if row["user_id"] is not None:
+            user_row = conn.execute("SELECT name FROM users WHERE id = ?", (row["user_id"],)).fetchone()
+            user_name = user_row["name"] if user_row is not None else None
+        conn.execute(
+            "UPDATE audit_log SET business_date = ?, user_name = ? WHERE id = ?",
+            (business_date_value, user_name, row["id"]),
+        )
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log (at_utc)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_business_date ON audit_log (business_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log (user_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log (action)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log (entity_type, entity_id)")
+
+    # Append-only enforcement at the DB level -- no UPDATE or DELETE is
+    # ever a legitimate operation on this table, from any code path,
+    # forever (see docs for Phase 11 Part A). A correction is always a
+    # new row; nothing in this codebase should ever need to catch these.
+    conn.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS trg_audit_log_no_update
+        BEFORE UPDATE ON audit_log
+        BEGIN
+            SELECT RAISE(ABORT, 'audit_log is append-only: UPDATE is not permitted');
+        END
+        """
+    )
+    conn.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS trg_audit_log_no_delete
+        BEFORE DELETE ON audit_log
+        BEGIN
+            SELECT RAISE(ABORT, 'audit_log is append-only: DELETE is not permitted');
+        END
+        """
+    )
+
+
+def _migration_0013_backups_v2(conn: sqlite3.Connection) -> None:
+    """Phase 11 Part B: backup_log already stored sha256/verified/size
+    per attempt (migration 0006) -- this adds the two columns a
+    "Backups" screen needs to show app/schema version per backup, plus
+    the settings a configurable retention/warning/auto-schedule policy
+    needs. backup_folder_secondary (migration 0006/settings_repo) is
+    reused as-is for "النسخة الخارجية" -- no new folder setting needed,
+    only the policy around it.
+    """
+    conn.execute("ALTER TABLE backup_log ADD COLUMN app_version TEXT")
+    conn.execute("ALTER TABLE backup_log ADD COLUMN schema_version INTEGER")
+
+    for key, value in (
+        ("backup_monthly_keep_count", "12"),
+        ("backup_warning_days", "2"),
+        ("backup_auto_hours", "0"),  # 0 = disabled; an owner-set N runs an extra backup every N hours
+        ("backup_on_exit_enabled", "1"),
+    ):
+        conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING", (key, value))
+
+
+def _migration_0014_shifts_employees_payroll(conn: sqlite3.Connection) -> None:
+    """Phase 11 Part C: shifts (tied to the existing drawer open/count),
+    employees, attendance (clock in/out), and payroll (advances,
+    deductions, bonuses, payments). `shift_id` is added as a NEW
+    NULLABLE column on the existing `orders` and `drawer_entries` tables
+    -- no CHECK constraint on either blocks a nullable integer column,
+    so this is a plain additive link, never a rebuild. A payroll
+    payment reuses the existing expenses mechanism (a new "مرتبات"
+    category) rather than inventing a second expense concept.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS shifts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            business_date TEXT NOT NULL,
+            opened_at_utc TEXT NOT NULL,
+            closed_at_utc TEXT,
+            opening_cash_piasters INTEGER NOT NULL DEFAULT 0,
+            counted_cash_piasters INTEGER,
+            expected_cash_piasters INTEGER,
+            difference_piasters INTEGER,
+            notes TEXT,
+            status TEXT NOT NULL CHECK (status IN ('open', 'closed')),
+            handed_over_to_user_id INTEGER,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (handed_over_to_user_id) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute("ALTER TABLE orders ADD COLUMN shift_id INTEGER")
+    conn.execute("ALTER TABLE drawer_entries ADD COLUMN shift_id INTEGER")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS employees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT,
+            job_title TEXT,
+            pay_type TEXT NOT NULL CHECK (pay_type IN ('daily', 'monthly')),
+            base_amount_piasters INTEGER NOT NULL CHECK (base_amount_piasters >= 0),
+            is_active INTEGER NOT NULL DEFAULT 1,
+            linked_user_id INTEGER,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (linked_user_id) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id INTEGER NOT NULL,
+            business_date TEXT NOT NULL,
+            clock_in_utc TEXT,
+            clock_out_utc TEXT,
+            note TEXT,
+            corrected_by INTEGER,
+            correction_reason TEXT,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (employee_id) REFERENCES employees (id),
+            FOREIGN KEY (corrected_by) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS payroll_lines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id INTEGER NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('advance', 'deduction', 'bonus')),
+            amount_piasters INTEGER NOT NULL CHECK (amount_piasters > 0),
+            line_date TEXT NOT NULL,
+            note TEXT,
+            applied_in_payment_id INTEGER,
+            created_by INTEGER NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (employee_id) REFERENCES employees (id),
+            FOREIGN KEY (created_by) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS payroll_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id INTEGER NOT NULL,
+            year_month TEXT NOT NULL,
+            base_piasters INTEGER NOT NULL DEFAULT 0,
+            bonuses_piasters INTEGER NOT NULL DEFAULT 0,
+            advances_piasters INTEGER NOT NULL DEFAULT 0,
+            deductions_piasters INTEGER NOT NULL DEFAULT 0,
+            net_piasters INTEGER NOT NULL DEFAULT 0,
+            payment_method TEXT NOT NULL CHECK (payment_method IN ('cash', 'instapay')),
+            expense_id INTEGER,
+            created_by INTEGER NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (employee_id) REFERENCES employees (id),
+            FOREIGN KEY (expense_id) REFERENCES expenses (id),
+            FOREIGN KEY (created_by) REFERENCES users (id)
+        )
+        """
+    )
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_shifts_user_status ON shifts (user_id, status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_shifts_business_date ON shifts (business_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_shift_id ON orders (shift_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_drawer_entries_shift_id ON drawer_entries (shift_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_attendance_employee_date ON attendance (employee_id, business_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_payroll_lines_employee ON payroll_lines (employee_id, applied_in_payment_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_payroll_payments_employee_month ON payroll_payments (employee_id, year_month)")
+
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES ('require_open_shift', '0') ON CONFLICT(key) DO NOTHING"
+    )
+
+    # "مرتبات" (payroll) expense category -- a payroll payment's auto-
+    # created expense is filed here, same pattern as "مشتريات" (migration
+    # 0009) for purchases.
+    conn.execute(
+        "INSERT INTO expense_categories (name, sort_order, is_active) "
+        "SELECT 'مرتبات', (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM expense_categories), 1 "
+        "WHERE NOT EXISTS (SELECT 1 FROM expense_categories WHERE name = 'مرتبات')"
+    )
+
+
+def _migration_0015_customers_credit(conn: sqlite3.Connection) -> None:
+    """Phase 11 Part D: customers and آجل (credit) sales. orders.
+    payment_method stays CHECK-constrained to ('cash', 'instapay') --
+    rather than widen that constraint (and risk every other place that
+    already matches on it), a credit sale is a PAID order with
+    payment_method left NULL and a NEW nullable customer_id column set
+    -- customer_id IS NOT NULL is what "this was sold on آجل" means
+    everywhere a service/report needs to tell the three apart. customer_
+    ledger is its own append-only-by-convention table (never UPDATEd or
+    DELETEd by any code path; a correction is always a new 'reversal'
+    row), mirroring drawer_entries' own ledger discipline.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT,
+            notes TEXT,
+            credit_limit_piasters INTEGER,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS customer_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            business_date TEXT NOT NULL,
+            entry_type TEXT NOT NULL CHECK (entry_type IN ('charge', 'payment', 'adjustment', 'reversal')),
+            amount_piasters INTEGER NOT NULL,
+            order_id INTEGER,
+            payment_method TEXT CHECK (payment_method IN ('cash', 'instapay') OR payment_method IS NULL),
+            user_id INTEGER,
+            note TEXT,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (customer_id) REFERENCES customers (id),
+            FOREIGN KEY (order_id) REFERENCES orders (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute("ALTER TABLE orders ADD COLUMN customer_id INTEGER")
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_customers_active_name ON customers (is_active, name)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_customer_ledger_customer ON customer_ledger (customer_id, created_at_utc)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_customer_ledger_business_date ON customer_ledger (business_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders (customer_id)")
+
+    for key, value in (
+        ("cashiers_may_sell_on_credit", "1"),
+        ("default_customer_credit_limit_piasters", "0"),  # 0 = no limit
+        ("customer_overdue_days", "14"),
+    ):
+        conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING", (key, value))
+
+    # A new drawer_entries entry type ('customer_payment_cash') would need
+    # widening drawer_entries.entry_type's CHECK, which SQLite cannot do
+    # via ALTER TABLE -- instead, a cash customer-payment gets its own
+    # parallel ledger table, UNIONed into the drawer's expected-cash math
+    # by drawer_service/drawer_repo rather than touching drawer_entries.
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS extra_drawer_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_type TEXT NOT NULL CHECK (entry_type IN ('customer_payment_cash')),
+            amount_delta_piasters INTEGER NOT NULL,
+            ref_type TEXT,
+            ref_id INTEGER,
+            shift_id INTEGER,
+            user_id INTEGER,
+            note TEXT,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_extra_drawer_entries_created_at ON extra_drawer_entries (created_at_utc)")
+
+
+def _migration_0016_extras(conn: sqlite3.Connection) -> None:
+    """Phase 11 Part E: named discount presets, the الرئيسية alerts
+    center's per-type toggles and thresholds, and the reorder list's
+    configurable target stock level.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS discount_presets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('percent', 'fixed')),
+            amount INTEGER NOT NULL CHECK (amount > 0),
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_discount_presets_active ON discount_presets (is_active, sort_order)")
+
+    # Optional owner-set target stock level per item, used by the
+    # reorder list to suggest a purchase quantity (target - current, if
+    # positive) -- defaults to min_qty * 2 at read time when unset
+    # (see supplies/reorder_service.py), so this column is nullable.
+    conn.execute("ALTER TABLE stock_items ADD COLUMN target_qty REAL")
+
+    for key, value in (
+        ("discount_free_form_pin_threshold_percent", "20"),
+        ("ps_long_session_alert_hours", "6"),
+        ("supplier_invoice_overdue_days", "14"),
+        ("alert_ps_long_session_enabled", "1"),
+        ("alert_customer_overdue_enabled", "1"),
+        ("alert_backup_overdue_enabled", "1"),
+        ("alert_low_stock_enabled", "1"),
+        ("alert_drawer_not_opened_enabled", "1"),
+        ("alert_shift_left_open_enabled", "1"),
+        ("alert_unpaid_supplier_invoices_enabled", "1"),
+    ):
+        conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING", (key, value))
+
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0001_initial,
     _migration_0002_menu,
@@ -725,6 +1067,11 @@ MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_0009_inventory,
     _migration_0010_stock_movement_business_date,
     _migration_0011_drawer_entries_is_historical_repair,
+    _migration_0012_audit_log_v2,
+    _migration_0013_backups_v2,
+    _migration_0014_shifts_employees_payroll,
+    _migration_0015_customers_credit,
+    _migration_0016_extras,
 ]
 
 

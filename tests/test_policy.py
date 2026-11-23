@@ -30,6 +30,10 @@ ALLOWED_STARTFILE_OR_BROWSER_FILES = {
     DERBY_DIR / "features" / "settings" / "update_check_panel.py",
     DERBY_DIR / "features" / "reports" / "export_panel.py",
     DERBY_DIR / "features" / "settings" / "about_panel.py",
+    # Phase 11 Part B: "فتح المجلد" on a backup_log row -- a LOCAL backup
+    # folder path, exactly the same safety class as export_panel.py's own
+    # "open containing export folder" button, never a network call.
+    DERBY_DIR / "features" / "closing" / "backups_list_dialog.py",
 }
 
 FORBIDDEN_DEPENDENCIES = [

@@ -11,6 +11,7 @@ from datetime import time as time_of_day
 from pathlib import Path
 from typing import List, Optional
 
+from derby import __version__ as APP_VERSION
 from derby.core.db import (
     audit_repo,
     backup_log_repo,
@@ -142,6 +143,11 @@ def close_or_rebuild_day(
         conn, db_path, "daily", file_name, primary_dir, secondary_dir, keep_count
     )
     backup_status_line = _backup_status_line(primary, secondary, secondary_dir is not None)
+
+    monthly_keep_count = int(settings_repo.get(conn, "backup_monthly_keep_count", "12") or "12")
+    backup_service.maybe_create_monthly_snapshot(
+        conn, db_path, business_date_value.strftime("%Y-%m"), primary_dir, secondary_dir, primary, secondary, monthly_keep_count
+    )
 
     low_stock_count = len(stock_items_repo.list_low_stock(conn))
     drawer_count_difference = None
@@ -302,6 +308,7 @@ def retry_secondary_backup(conn: sqlite3.Connection, db_path: Path, secondary_di
     backup_log_repo.log_backup(
         conn, "daily", "secondary", outcome.status, path=outcome.path, size_bytes=outcome.size_bytes,
         sha256=outcome.sha256, verified=outcome.verified, error=outcome.error,
+        app_version=APP_VERSION, schema_version=conn.execute("PRAGMA user_version").fetchone()[0],
     )
 
     business_date_text = file_name[len("derby-"):-len(".db")] if file_name.startswith("derby-") else None

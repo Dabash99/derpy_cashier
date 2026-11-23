@@ -113,6 +113,30 @@ def list_orders(
     ).fetchall()
 
 
+def list_paid_between(conn: sqlite3.Connection, start_utc: str, end_utc: str) -> List[sqlite3.Row]:
+    """Every order paid within [start_utc, end_utc] -- used by
+    shift_service.build_shift_report, which reports by real wall-clock
+    shift window rather than by business_date (a shift can start or end
+    mid-business-day)."""
+    return conn.execute(
+        "SELECT * FROM orders WHERE status = 'paid' AND paid_at_utc >= ? AND paid_at_utc <= ? ORDER BY paid_at_utc",
+        (start_utc, end_utc),
+    ).fetchall()
+
+
+def list_voided_between(conn: sqlite3.Connection, start_utc: str, end_utc: str) -> List[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM orders WHERE status = 'void' AND voided_at_utc >= ? AND voided_at_utc <= ? ORDER BY voided_at_utc",
+        (start_utc, end_utc),
+    ).fetchall()
+
+
+def set_shift_id(conn: sqlite3.Connection, order_id: int, shift_id: Optional[int], commit: bool = True) -> None:
+    conn.execute("UPDATE orders SET shift_id = ? WHERE id = ?", (shift_id, order_id))
+    if commit:
+        conn.commit()
+
+
 def update_order_totals(
     conn: sqlite3.Connection, order_id: int, subtotal_piasters: int, discount_piasters: int, total_piasters: int, commit: bool = True
 ) -> None:
@@ -160,6 +184,32 @@ def mark_order_paid(
         WHERE id = ?
         """,
         (invoice_no, paid_by, to_utc_iso(utc_now()), business_date, payment_method, order_id),
+    )
+    if commit:
+        conn.commit()
+
+
+def mark_order_paid_on_credit(
+    conn: sqlite3.Connection,
+    order_id: int,
+    invoice_no: int,
+    paid_by: int,
+    business_date: str,
+    customer_id: int,
+    commit: bool = True,
+) -> None:
+    """A آجل (credit) sale: payment_method stays NULL (the column's CHECK
+    only allows 'cash'/'instapay'/NULL -- never widened, see migration
+    0015's docstring) and customer_id is set instead. customer_id IS NOT
+    NULL is what "this was sold on credit" means everywhere else."""
+    conn.execute(
+        """
+        UPDATE orders
+        SET status = 'paid', invoice_no = ?, paid_by = ?, paid_at_utc = ?, business_date = ?,
+            payment_method = NULL, customer_id = ?
+        WHERE id = ?
+        """,
+        (invoice_no, paid_by, to_utc_iso(utc_now()), business_date, customer_id, order_id),
     )
     if commit:
         conn.commit()

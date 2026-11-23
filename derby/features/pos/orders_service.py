@@ -13,6 +13,7 @@ import sqlite3
 from datetime import time as time_of_day
 from typing import List, Optional
 
+from derby.core import audit_service
 from derby.core.db import (
     audit_repo,
     drawer_repo,
@@ -20,9 +21,11 @@ from derby.core.db import (
     products_repo,
     ps_sessions_repo,
     settings_repo,
+    shifts_repo,
     users_repo,
 )
 from derby.core.utils.business_date import business_date as compute_business_date
+from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import parse_utc_iso, utc_now
 from derby.features.inventory import stock_service
 from derby.features.pos import discount_math, owner_approval
@@ -35,6 +38,7 @@ from derby.features.pos.exceptions import (
     PermissionDeniedError,
     QuantityOutOfRangeError,
     SessionRunningError,
+    ShiftRequiredError,
     TableBusyError,
     VoidReasonRequiredError,
 )
@@ -249,6 +253,7 @@ def apply_discount(
     reason: str,
     requesting_user: sqlite3.Row,
     approving_pin: Optional[str] = None,
+    preset_name: Optional[str] = None,
 ) -> sqlite3.Row:
     reason = (reason or "").strip()
     if not reason:
@@ -266,17 +271,22 @@ def apply_discount(
     try:
         orders_repo.set_order_discount(conn, order_id, discount_piasters, reason, approver_id, commit=False)
         recompute_totals(conn, order_id, commit=False)
-        audit_repo.log(
-            conn,
-            "discount_applied",
-            user_id=requesting_user["id"],
-            details="order={0} amount={1} reason={2} approved_by={3}".format(
-                order_id, discount_piasters, reason, approver_id
-            ),
-        )
+        conn.commit()
     except Exception:
         conn.rollback()
         raise
+    audit_service.log(
+        conn, "discount_preset_used" if preset_name else "discount_applied", user=requesting_user,
+        entity_type="order", entity_id=order_id,
+        summary_ar="تطبيق خصم {0}{1} على فاتورة #{2}: {3}".format(
+            format_egp(discount_piasters), " ({0})".format(preset_name) if preset_name else "", order_id, reason
+        ),
+        details={
+            "kind": kind, "amount": amount, "discount_piasters": discount_piasters, "reason": reason,
+            "approved_by": approver_id, "preset_name": preset_name,
+        },
+        severity=audit_service.SEVERITY_WARNING,
+    )
     return orders_repo.get_order(conn, order_id)
 
 
@@ -291,15 +301,14 @@ def remove_discount(
     try:
         orders_repo.clear_order_discount(conn, order_id, commit=False)
         recompute_totals(conn, order_id, commit=False)
-        audit_repo.log(
-            conn,
-            "discount_removed",
-            user_id=requesting_user["id"],
-            details="order={0} approved_by={1}".format(order_id, approver_id),
-        )
+        conn.commit()
     except Exception:
         conn.rollback()
         raise
+    audit_service.log(
+        conn, "discount_removed", user=requesting_user, entity_type="order", entity_id=order_id,
+        summary_ar="إلغاء خصم عن فاتورة #{0}".format(order_id), details={"approved_by": approver_id},
+    )
     return orders_repo.get_order(conn, order_id)
 
 
@@ -336,15 +345,25 @@ def pay(conn: sqlite3.Connection, order_id: int, payment_method: str, requesting
     _require_open(order)
     if order["device_id"] is not None and ps_sessions_repo.get_running_session(conn, order["device_id"]) is not None:
         raise SessionRunningError("device {0} has a running session".format(order["device_id"]))
+    if settings_repo.get(conn, "require_open_shift", "0") == "1" and shifts_repo.get_open_shift(conn) is None:
+        raise ShiftRequiredError("a shift must be open before taking a payment")
 
     close_time = _close_time_setting(conn)
     today = compute_business_date(utc_now(), close_time).isoformat()
+    # Opportunistic linking only (Phase 11 Part C) -- the shift REPORT
+    # itself is computed by real time window (see shift_service.
+    # build_shift_report), not by this column, so a NULL shift_id here
+    # (no shift open, require_open_shift off) never loses any data.
+    open_shift = shifts_repo.get_open_shift(conn)
+    shift_id = open_shift["id"] if open_shift is not None else None
 
     try:
         invoice_no = orders_repo.next_invoice_no(conn)
         orders_repo.mark_order_paid(
             conn, order_id, invoice_no, requesting_user["id"], today, payment_method, commit=False
         )
+        if shift_id is not None:
+            orders_repo.set_shift_id(conn, order_id, shift_id, commit=False)
         stock_service.apply_sale_deductions(conn, order_id, requesting_user["id"])
         if payment_method == "cash":
             # InstaPay is deliberately excluded here -- it never touches
@@ -352,7 +371,7 @@ def pay(conn: sqlite3.Connection, order_id: int, payment_method: str, requesting
             paid_order = orders_repo.get_order(conn, order_id)
             drawer_repo.create_entry(
                 conn, drawer_repo.TYPE_SALE_CASH, paid_order["total_piasters"], ref_type="order", ref_id=order_id,
-                user_id=requesting_user["id"], commit=False,
+                user_id=requesting_user["id"], shift_id=shift_id, commit=False,
             )
         conn.commit()
     except Exception:
@@ -363,6 +382,10 @@ def pay(conn: sqlite3.Connection, order_id: int, payment_method: str, requesting
 
 def void(conn: sqlite3.Connection, order_id: int, reason: str, requesting_user: sqlite3.Row) -> sqlite3.Row:
     if requesting_user["role"] != users_repo.ROLE_OWNER:
+        audit_service.log(
+            conn, "permission_denied", user=requesting_user, entity_type="order", entity_id=order_id,
+            summary_ar="محاولة إبطال فاتورة #{0} بدون صلاحية".format(order_id), severity=audit_service.SEVERITY_WARNING,
+        )
         raise PermissionDeniedError("only the owner can void a paid order")
     reason = (reason or "").strip()
     if not reason:
@@ -375,12 +398,29 @@ def void(conn: sqlite3.Connection, order_id: int, reason: str, requesting_user: 
     try:
         stock_service.reverse_sale_deductions(conn, order_id, requesting_user["id"])
         orders_repo.mark_order_void(conn, order_id, requesting_user["id"], reason, commit=False)
-        audit_repo.log(
-            conn, "order_voided", user_id=requesting_user["id"], details="order={0} reason={1}".format(order_id, reason)
-        )
+        if order["customer_id"] is not None:
+            from derby.features.customers import (
+                customer_service,  # local import: avoids a cross-feature import at module load time
+            )
+
+            customer_service.reverse_credit_sale_on_void(conn, order, requesting_user, commit=False)
+        conn.commit()
     except Exception:
         conn.rollback()
         raise
+    if order["customer_id"] is not None:
+        audit_service.log(
+            conn, "credit_sale_void_reversed", user=requesting_user, entity_type="customer", entity_id=order["customer_id"],
+            summary_ar="عكس بيع بالآجل بسبب إبطال فاتورة #{0}".format(order_id),
+            details={"order_id": order_id, "amount_piasters": order["total_piasters"]},
+            severity=audit_service.SEVERITY_WARNING,
+        )
+    audit_service.log(
+        conn, "order_voided", user=requesting_user, entity_type="order", entity_id=order_id,
+        summary_ar="إبطال فاتورة #{0}: {1}".format(order_id, reason),
+        details={"total_piasters": order["total_piasters"], "payment_method": order["payment_method"], "reason": reason},
+        severity=audit_service.SEVERITY_CRITICAL,
+    )
     return orders_repo.get_order(conn, order_id)
 
 

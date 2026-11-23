@@ -29,7 +29,7 @@ class SettingsScreen(QWidget):
 
         tabs = QTabWidget()
         configure_tab_widget(tabs)
-        self._general_form = GeneralSettingsForm(conn)
+        self._general_form = GeneralSettingsForm(conn, user)
         self._users_widget = UsersManagementWidget(conn, user["id"])
         self._update_panel = UpdateCheckPanel(conn)
         self._backup_closing_panel = BackupClosingPanel(conn, user, db_path)

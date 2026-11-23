@@ -18,7 +18,8 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
-from derby.core.db import audit_repo, users_repo
+from derby.core import audit_service
+from derby.core.db import users_repo
 from derby.core.i18n import ar
 from derby.core.theme import icons
 from derby.features.auth import lockout
@@ -110,6 +111,7 @@ class LoginScreen(QWidget):
 
         user = users_repo.find_active_user_by_pin(self._conn, pin)
         if user is None:
+            audit_service.log(self._conn, "login_failed", summary_ar="محاولة دخول برقم سري خاطئ", severity=audit_service.SEVERITY_WARNING)
             lockout.record_failed_attempt(self._conn)
             self._pin_display.clear()
             remaining_after = lockout.get_lock_remaining(self._conn)
@@ -120,7 +122,7 @@ class LoginScreen(QWidget):
             return
 
         lockout.reset_failed_attempts(self._conn)
-        audit_repo.log(self._conn, "login", user_id=user["id"])
+        audit_service.log(self._conn, "login", user=user, entity_type="user", entity_id=user["id"], summary_ar="تسجيل دخول: {0}".format(user["name"]))
         self._pin_display.clear()
         self._error_label.setText("")
         self.login_succeeded.emit(user)

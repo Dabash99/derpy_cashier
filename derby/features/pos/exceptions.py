@@ -59,3 +59,16 @@ class DeviceRateNotSetError(OrderError):
 
 class SessionRunningError(OrderError):
     """A running PlayStation session blocks this action (pay, move, disable, ...)."""
+
+
+class ShiftRequiredError(OrderError):
+    """settings.require_open_shift is on and no shift is open."""
+
+
+class CreditNotAllowedError(OrderError):
+    """A cashier tried to sell on آجل while cashiers_may_sell_on_credit is off."""
+
+
+class CreditLimitExceededError(OrderError):
+    """The sale would push the customer's balance past their credit limit
+    without owner PIN approval."""

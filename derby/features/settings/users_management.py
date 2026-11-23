@@ -21,6 +21,7 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
+from derby.core import audit_service
 from derby.core.db import users_repo
 from derby.core.i18n import ar
 from derby.core.utils.pin_hash import is_valid_pin_format
@@ -162,7 +163,13 @@ class UsersManagementWidget(QWidget):
             self._message_label.setText(ar.USERS_ERROR_PIN_TAKEN)
             return
 
-        users_repo.create_user(self._conn, name, role, pin)
+        new_user_id = users_repo.create_user(self._conn, name, role, pin)
+        audit_service.log(
+            self._conn, "user_created", user_id=self._current_user_id,
+            entity_type="user", entity_id=new_user_id,
+            summary_ar="إضافة مستخدم: {0} ({1})".format(name, role),
+            details={"name": name, "role": role},
+        )
         self._add_name_input.clear()
         self._add_pin_input.clear()
         self._add_pin_confirm_input.clear()
@@ -176,7 +183,15 @@ class UsersManagementWidget(QWidget):
         if not new_name:
             self._message_label.setText(ar.USERS_ERROR_NAME_REQUIRED)
             return
+        old_user = users_repo.get_user(self._conn, self._selected_user_id)
+        old_name = old_user["name"] if old_user is not None else ""
         users_repo.rename_user(self._conn, self._selected_user_id, new_name)
+        audit_service.log(
+            self._conn, "user_renamed", user_id=self._current_user_id,
+            entity_type="user", entity_id=self._selected_user_id,
+            summary_ar="تعديل اسم مستخدم: {0} -> {1}".format(old_name, new_name),
+            details={"before": old_name, "after": new_name},
+        )
         self._message_label.setText(ar.USERS_SAVED_MESSAGE)
         self.reload()
 
@@ -195,6 +210,11 @@ class UsersManagementWidget(QWidget):
             self._message_label.setText(ar.USERS_ERROR_PIN_TAKEN)
             return
         users_repo.change_pin(self._conn, self._selected_user_id, new_pin)
+        audit_service.log(
+            self._conn, "user_pin_changed", user_id=self._current_user_id,
+            entity_type="user", entity_id=self._selected_user_id,
+            summary_ar="تغيير الرقم السري لمستخدم", severity=audit_service.SEVERITY_WARNING,
+        )
         self._new_pin_input.clear()
         self._new_pin_confirm_input.clear()
         self._message_label.setText(ar.USERS_SAVED_MESSAGE)
@@ -212,7 +232,17 @@ class UsersManagementWidget(QWidget):
                 self._message_label.setText(ar.USERS_ERROR_CANNOT_DEACTIVATE_LAST_OWNER)
                 return
             users_repo.set_active(self._conn, self._selected_user_id, False)
+            audit_service.log(
+                self._conn, "user_deactivated", user_id=self._current_user_id,
+                entity_type="user", entity_id=self._selected_user_id,
+                summary_ar="تعطيل مستخدم: {0}".format(user["name"]), severity=audit_service.SEVERITY_WARNING,
+            )
         else:
             users_repo.set_active(self._conn, self._selected_user_id, True)
+            audit_service.log(
+                self._conn, "user_reactivated", user_id=self._current_user_id,
+                entity_type="user", entity_id=self._selected_user_id,
+                summary_ar="تفعيل مستخدم: {0}".format(user["name"]),
+            )
         self._message_label.setText(ar.USERS_SAVED_MESSAGE)
         self.reload()

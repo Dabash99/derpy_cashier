@@ -27,11 +27,13 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
+from derby.core import audit_service
 from derby.core.db import backup_log_repo, day_closures_repo, settings_repo
 from derby.core.i18n import ar
 from derby.core.integrations import whatsapp
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo, utc_now
 from derby.features.closing import backup_service, closing_service
+from derby.features.closing.backups_list_dialog import BackupsListDialog
 from derby.features.closing.closing_worker import ClosingWorker
 from derby.features.closing.closures_list_dialog import ClosuresListDialog
 from derby.features.closing.restore_dialog import RestoreDialog
@@ -69,6 +71,21 @@ class BackupClosingPanel(QWidget):
         self._keep_count_input = QSpinBox()
         self._keep_count_input.setRange(1, 365)
         form.addRow(ar.CLOSING_KEEP_COUNT_LABEL, self._keep_count_input)
+
+        self._monthly_keep_count_input = QSpinBox()
+        self._monthly_keep_count_input.setRange(1, 60)
+        form.addRow(ar.CLOSING_MONTHLY_KEEP_COUNT_LABEL, self._monthly_keep_count_input)
+
+        self._warning_days_input = QSpinBox()
+        self._warning_days_input.setRange(1, 30)
+        form.addRow(ar.CLOSING_WARNING_DAYS_LABEL, self._warning_days_input)
+
+        self._auto_hours_input = QSpinBox()
+        self._auto_hours_input.setRange(0, 24)
+        form.addRow(ar.CLOSING_AUTO_HOURS_LABEL, self._auto_hours_input)
+
+        self._backup_on_exit_checkbox = QCheckBox(ar.CLOSING_BACKUP_ON_EXIT_LABEL)
+        form.addRow(self._backup_on_exit_checkbox)
 
         self._whatsapp_number_input = QLineEdit()
         self._whatsapp_number_input.textChanged.connect(self._update_whatsapp_hint)
@@ -122,6 +139,9 @@ class BackupClosingPanel(QWidget):
         list_button = QPushButton(ar.CLOSING_LIST_BUTTON)
         list_button.clicked.connect(self._on_open_list)
         actions_row.addWidget(list_button)
+        backups_list_button = QPushButton(ar.CLOSING_BACKUPS_LIST_BUTTON)
+        backups_list_button.clicked.connect(self._on_open_backups_list)
+        actions_row.addWidget(backups_list_button)
         outer.addLayout(actions_row)
 
         scroll_area.setWidget(content)
@@ -175,6 +195,10 @@ class BackupClosingPanel(QWidget):
         values = settings_repo.get_all(self._conn)
         self._enable_checkbox.setChecked(values["closing_enabled"] == "1")
         self._keep_count_input.setValue(int(values["backup_keep_count"]))
+        self._monthly_keep_count_input.setValue(int(values.get("backup_monthly_keep_count") or "12"))
+        self._warning_days_input.setValue(int(values.get("backup_warning_days") or "2"))
+        self._auto_hours_input.setValue(int(values.get("backup_auto_hours") or "0"))
+        self._backup_on_exit_checkbox.setChecked((values.get("backup_on_exit_enabled") or "1") == "1")
         self._whatsapp_number_input.setText(values["whatsapp_number"])
         index = self._whatsapp_method_input.findData(values["whatsapp_method"])
         if index >= 0:
@@ -213,12 +237,25 @@ class BackupClosingPanel(QWidget):
                 self._error_label.setText(error)
                 return
 
+        before = settings_repo.get_all(self._conn)
         settings_repo.set_value(self._conn, "closing_enabled", "1" if self._enable_checkbox.isChecked() else "0")
         settings_repo.set_value(self._conn, "backup_keep_count", str(self._keep_count_input.value()))
+        settings_repo.set_value(self._conn, "backup_monthly_keep_count", str(self._monthly_keep_count_input.value()))
+        settings_repo.set_value(self._conn, "backup_warning_days", str(self._warning_days_input.value()))
+        settings_repo.set_value(self._conn, "backup_auto_hours", str(self._auto_hours_input.value()))
+        settings_repo.set_value(self._conn, "backup_on_exit_enabled", "1" if self._backup_on_exit_checkbox.isChecked() else "0")
         settings_repo.set_value(self._conn, "whatsapp_number", number)
         settings_repo.set_value(self._conn, "whatsapp_method", self._whatsapp_method_input.currentData())
         settings_repo.set_value(self._conn, "backup_folder_primary", self._primary_input.text().strip())
         settings_repo.set_value(self._conn, "backup_folder_secondary", self._secondary_input.text().strip())
+        after = settings_repo.get_all(self._conn)
+        changed = {key: {"before": before.get(key), "after": value} for key, value in after.items() if before.get(key) != value}
+        if changed:
+            audit_service.log(
+                self._conn, "settings_changed", user=self._user, entity_type="settings",
+                summary_ar="تغيير إعدادات النسخ الاحتياطي والإقفال: {0}".format(", ".join(changed.keys())),
+                details=changed,
+            )
         self._error_label.setText("")
 
     # --- actions (all via ClosingWorker) --------------------------------
@@ -267,9 +304,15 @@ class BackupClosingPanel(QWidget):
         self._run_worker(work, self._on_backup_done)
 
     def _on_backup_done(self, result) -> None:
-        primary, _secondary = result
+        primary, secondary = result
         message = ar.CLOSING_BACKUP_SUCCESS if primary.status == "ok" else ar.CLOSING_BACKUP_FAILED.format(error=primary.error or "")
         self._refresh_status(leading_message=message)
+        audit_service.log(
+            self._conn, "backup_now", user=self._user, entity_type="backup",
+            summary_ar="نسخة احتياطية يدوية: {0}".format("نجحت" if primary.status == "ok" else "فشلت"),
+            details={"primary_status": primary.status, "secondary_status": secondary.status},
+            severity=audit_service.SEVERITY_INFO if primary.status == "ok" else audit_service.SEVERITY_WARNING,
+        )
 
     def _on_close_today(self) -> None:
         primary_dir, secondary_dir = self._primary_dir(), self._secondary_dir()
@@ -303,6 +346,12 @@ class BackupClosingPanel(QWidget):
     def _on_retry_secondary_done(self, outcome) -> None:
         message = ar.CLOSING_BACKUP_SUCCESS if outcome.status == "ok" else ar.CLOSING_BACKUP_FAILED.format(error=outcome.error or "")
         self._refresh_status(leading_message=message)
+        audit_service.log(
+            self._conn, "backup_retry_secondary", user=self._user, entity_type="backup",
+            summary_ar="إعادة محاولة النسخة الخارجية: {0}".format("نجحت" if outcome.status == "ok" else "فشلت"),
+            details={"status": outcome.status, "error": outcome.error},
+            severity=audit_service.SEVERITY_INFO if outcome.status == "ok" else audit_service.SEVERITY_WARNING,
+        )
 
     def _on_restore(self) -> None:
         dialog = RestoreDialog(self._conn, self._user, self._primary_dir(), parent=self)
@@ -316,3 +365,7 @@ class BackupClosingPanel(QWidget):
         dialog = ClosuresListDialog(self._conn, self._user, self._db_path, parent=self)
         dialog.exec_()
         self._refresh_status()
+
+    def _on_open_backups_list(self) -> None:
+        dialog = BackupsListDialog(self._conn, self._user, parent=self)
+        dialog.exec_()

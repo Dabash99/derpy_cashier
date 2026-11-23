@@ -36,7 +36,15 @@ _STATUS_LABELS = {
     "cancelled": ar.SALES_LOG_STATUS_CANCELLED,
     "void": ar.SALES_LOG_STATUS_VOID,
 }
-_METHOD_LABELS = {"cash": ar.PAYMENT_METHOD_CASH, "instapay": ar.PAYMENT_METHOD_INSTAPAY}
+_METHOD_LABELS = {"cash": ar.PAYMENT_METHOD_CASH, "instapay": ar.PAYMENT_METHOD_INSTAPAY, "credit": ar.PAYMENT_METHOD_CREDIT}
+
+
+def _method_key(order: sqlite3.Row) -> str:
+    """آجل sales leave payment_method NULL and set customer_id instead
+    (see orders_repo.mark_order_paid_on_credit)."""
+    if order["customer_id"]:
+        return "credit"
+    return order["payment_method"]
 
 
 class SalesLogScreen(QWidget):
@@ -72,6 +80,7 @@ class SalesLogScreen(QWidget):
         self._method_filter.addItem(ar.SALES_LOG_FILTER_ALL, None)
         self._method_filter.addItem(ar.PAYMENT_METHOD_CASH, "cash")
         self._method_filter.addItem(ar.PAYMENT_METHOD_INSTAPAY, "instapay")
+        self._method_filter.addItem(ar.PAYMENT_METHOD_CREDIT, "credit")
         self._method_filter.currentIndexChanged.connect(self.reload)
         filters_row.addWidget(self._method_filter)
 
@@ -132,7 +141,7 @@ class SalesLogScreen(QWidget):
         method_filter = self._method_filter.currentData()
         orders = orders_repo.list_orders(self._conn, business_date=selected_date, status=status_filter)
         if method_filter is not None:
-            orders = [order for order in orders if order["payment_method"] == method_filter]
+            orders = [order for order in orders if _method_key(order) == method_filter]
 
         self._orders_by_row = orders
         self._table.setRowCount(len(orders))
@@ -154,7 +163,7 @@ class SalesLogScreen(QWidget):
         if order["paid_by"]:
             cashier = users_repo.get_user(self._conn, order["paid_by"])
             cashier_name = cashier["name"] if cashier is not None else ""
-        method_text = _METHOD_LABELS.get(order["payment_method"], order["payment_method"] or "")
+        method_text = _METHOD_LABELS.get(_method_key(order), order["payment_method"] or "")
         status_text = _STATUS_LABELS.get(order["status"], order["status"])
 
         makers = [centered_item, centered_item, right_item, centered_item, centered_item, right_item, centered_item]
@@ -174,11 +183,13 @@ class SalesLogScreen(QWidget):
         all_paid = orders_repo.list_orders(self._conn, business_date=selected_date, status="paid")
         count = len(all_paid)
         total = sum(order["total_piasters"] for order in all_paid)
-        cash_total = sum(order["total_piasters"] for order in all_paid if order["payment_method"] == "cash")
-        instapay_total = sum(order["total_piasters"] for order in all_paid if order["payment_method"] == "instapay")
+        cash_total = sum(order["total_piasters"] for order in all_paid if _method_key(order) == "cash")
+        instapay_total = sum(order["total_piasters"] for order in all_paid if _method_key(order) == "instapay")
+        credit_total = sum(order["total_piasters"] for order in all_paid if _method_key(order) == "credit")
         self._totals_label.setText(
             ar.SALES_LOG_TOTALS_SUMMARY.format(
-                count=count, total=format_egp(total), cash=format_egp(cash_total), instapay=format_egp(instapay_total)
+                count=count, total=format_egp(total), cash=format_egp(cash_total), instapay=format_egp(instapay_total),
+                credit=format_egp(credit_total),
             )
         )
 

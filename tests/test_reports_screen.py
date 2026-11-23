@@ -26,7 +26,7 @@ def test_daily_tab_shows_hand_calculated_summary(qapp, db_conn):
 
     assert screen._report.net_sales_piasters == 5000
     assert "50.00" in screen._tile_net_sales._value_label.text()
-    assert screen._payment_section.table.rowCount() == 2  # cash + instapay rows always shown
+    assert screen._payment_section.table.rowCount() == 3  # cash + instapay + آجل rows always shown
     assert screen._top_items_section.table.rowCount() == 1
 
 

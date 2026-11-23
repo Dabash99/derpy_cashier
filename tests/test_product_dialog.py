@@ -86,8 +86,8 @@ def test_editing_price_writes_audit_log(qapp, db_conn):
         "SELECT * FROM audit_log WHERE action = 'product_price_changed'"
     ).fetchall()
     assert len(rows) == 1
-    assert "old=100" in rows[0]["details"]
-    assert "new=3000" in rows[0]["details"]
+    assert '"before_piasters": 100' in rows[0]["details_json"]
+    assert '"after_piasters": 3000' in rows[0]["details_json"]
     assert rows[0]["user_id"] == user_id
 
 

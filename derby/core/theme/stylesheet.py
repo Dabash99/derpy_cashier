@@ -158,6 +158,11 @@ def build_stylesheet() -> str:
         font-weight: 600;
     }}
 
+    QLabel[role="warning"] {{
+        color: {warning};
+        font-weight: 600;
+    }}
+
     QLabel[variant="chip"] {{
         background-color: {surface};
         border: 1px solid {surface_border};
@@ -420,6 +425,7 @@ def build_stylesheet() -> str:
         danger=tokens.DANGER,
         danger_pressed=tokens.DANGER_PRESSED,
         success=tokens.SUCCESS,
+        warning=tokens.WARNING,
         disabled_fill=tokens.DISABLED_FILL,
         disabled_text=tokens.DISABLED_TEXT,
         sidebar_background=tokens.SIDEBAR_BACKGROUND,

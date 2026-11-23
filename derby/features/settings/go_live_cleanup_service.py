@@ -1,10 +1,19 @@
 """Owner-only go-live cleanup ("تصفية بيانات التجربة"): wipes every row
 of OPERATIONAL/test data -- orders and everything billed off them
 (order items, add-on lines, PlayStation sessions), expenses, supplies,
-day closures, the backup log, and the whole audit trail -- while
-keeping users, settings, the menu (categories/products/add-ons/images),
-PlayStation devices and their rates, tables, and expense categories/
-recurring templates. Resets the invoice counter back to 1.
+day closures, and the backup log -- while keeping users, settings, the
+menu (categories/products/add-ons/images), PlayStation devices and
+their rates, tables, and expense categories/recurring templates.
+Resets the invoice counter back to 1.
+
+audit_log is Phase 11 append-only (DB triggers reject any UPDATE/DELETE
+on it, see migrations.py's migration 0012) and is deliberately NOT
+wiped here anymore, even though every release before Phase 11 did wipe
+it -- "no automatic deletion, ever" applies to this cleanup too, not
+only to ordinary business operations. A cafe running this before go-live
+keeps whatever test-period audit trail it already produced; this is a
+one-time, owner-approved action, not routine operation, so that is an
+acceptable (and arguably more honest) trade-off.
 
 Safeguards, checked in this order (nothing is deleted unless all three
 pass): the owner's PIN, a typed confirmation word, and a verified
@@ -67,11 +76,10 @@ def run_cleanup(
         for table in _TABLES_IN_DELETE_ORDER:
             counts[table] = conn.execute("SELECT COUNT(*) FROM {0}".format(table)).fetchone()[0]
             conn.execute("DELETE FROM {0}".format(table))
-        counts["audit_log"] = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
-        conn.execute("DELETE FROM audit_log")
+        # audit_log is append-only (Phase 11) -- never wiped here. Its
+        # pre-cleanup row count is still reported for the owner's record.
+        counts["audit_log_before_cleanup"] = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
         settings_repo.set_value(conn, "next_invoice_no", "1")
-        # The one audit entry that must survive the cleanup -- written
-        # after the sweep, in the same transaction audit_repo.log() commits.
         audit_repo.log(
             conn, "go_live_cleanup", user_id=requesting_user["id"],
             details="backup={0} counts={1}".format(backup_path, counts),

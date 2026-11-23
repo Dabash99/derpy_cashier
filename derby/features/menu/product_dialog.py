@@ -28,9 +28,10 @@ from PySide2.QtWidgets import (
     QVBoxLayout,
 )
 
-from derby.core.db import addons_repo, audit_repo, categories_repo, products_repo, recipes_repo
+from derby.core import audit_service
+from derby.core.db import addons_repo, categories_repo, products_repo, recipes_repo
 from derby.core.i18n import ar
-from derby.core.utils.money import piasters_to_plain_text
+from derby.core.utils.money import format_egp, piasters_to_plain_text
 from derby.features.inventory.recipe_editor_dialog import RecipeEditorDialog
 from derby.features.menu import images
 from derby.features.menu.price_parsing import parse_product_price
@@ -253,13 +254,17 @@ class ProductDialog(QDialog):
         addons_repo.set_product_addon_groups(self._conn, self._product_id, self._selected_group_ids())
 
         if old_price_piasters is not None and old_price_piasters != price_piasters:
-            audit_repo.log(
+            audit_service.log(
                 self._conn,
                 "product_price_changed",
                 user_id=self._user_id,
-                details="product_id={0} old={1} new={2}".format(
-                    self._product_id, old_price_piasters, price_piasters
+                entity_type="product",
+                entity_id=self._product_id,
+                summary_ar="تغيير سعر {0}: {1} -> {2}".format(
+                    name_ar, format_egp(old_price_piasters), format_egp(price_piasters)
                 ),
+                details={"before_piasters": old_price_piasters, "after_piasters": price_piasters},
+                severity=audit_service.SEVERITY_WARNING,
             )
 
         self.accept()

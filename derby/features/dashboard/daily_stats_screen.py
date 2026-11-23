@@ -10,6 +10,7 @@ from __future__ import annotations
 import sqlite3
 import sys
 from datetime import timedelta
+from pathlib import Path
 
 from PySide2.QtCore import Qt, QTimer, Signal
 from PySide2.QtGui import QHideEvent, QShowEvent
@@ -24,18 +25,27 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
-from derby.core.db import stock_items_repo
+from derby.core.db import settings_repo, stock_items_repo
 from derby.core.i18n import ar
 from derby.core.theme.stat_tile import StatTile
 from derby.core.theme.styled import enable_styled_background
 from derby.core.utils import error_log
 from derby.core.utils.money import format_egp
+from derby.core.utils.time_utils import utc_now
 from derby.features.auth import permissions
+from derby.features.closing import backup_service
 from derby.features.dashboard import daily_stats_service
 from derby.features.dashboard.hourly_bar_chart import HourlyBarChart
 from derby.features.dashboard.open_orders_panel import OpenOrdersPanel
 from derby.features.inventory import drawer_service
 from derby.features.reports import report_service
+
+_EXTERNAL_BACKUP_LABELS = {
+    "ok": ar.DASHBOARD_EXTERNAL_BACKUP_OK,
+    "warning": ar.DASHBOARD_EXTERNAL_BACKUP_WARNING,
+    "missing": ar.DASHBOARD_EXTERNAL_BACKUP_MISSING,
+}
+_EXTERNAL_BACKUP_ROLES = {"ok": "success", "warning": "warning", "missing": "error"}
 
 _REFRESH_INTERVAL_MS = 30_000
 _TOP_ITEMS_LIMIT = 5
@@ -185,9 +195,10 @@ class DailyStatsScreen(QWidget):
         self._tile_discounts = StatTile(ar.REPORTS_SUMMARY_DISCOUNTS)
         self._tile_cash = StatTile(ar.PAYMENT_METHOD_CASH)
         self._tile_instapay = StatTile(ar.PAYMENT_METHOD_INSTAPAY)
+        self._tile_credit = StatTile(ar.PAYMENT_METHOD_CREDIT)
         for tile in (
             self._tile_net_sales, self._tile_invoice_count, self._tile_average_invoice,
-            self._tile_discounts, self._tile_cash, self._tile_instapay,
+            self._tile_discounts, self._tile_cash, self._tile_instapay, self._tile_credit,
         ):
             self._tiles_row.addWidget(tile)
 
@@ -196,13 +207,16 @@ class DailyStatsScreen(QWidget):
         self._tile_expenses = StatTile(ar.REPORTS_SUMMARY_EXPENSES)
         self._tile_net_today = StatTile(ar.DASHBOARD_NET_TODAY_LABEL)
         self._tile_gross_profit = StatTile(ar.DASHBOARD_GROSS_PROFIT_TODAY_LABEL)
+        self._tile_external_backup = StatTile(ar.DASHBOARD_EXTERNAL_BACKUP_LABEL)
         self._owner_tiles_row.addWidget(self._tile_expenses)
         self._owner_tiles_row.addWidget(self._tile_net_today)
         self._owner_tiles_row.addWidget(self._tile_gross_profit)
+        self._owner_tiles_row.addWidget(self._tile_external_backup)
         self._owner_tiles_row.addStretch(1)
         self._tile_expenses.setVisible(self._is_owner)
         self._tile_net_today.setVisible(self._is_owner)
         self._tile_gross_profit.setVisible(self._is_owner)
+        self._tile_external_backup.setVisible(self._is_owner)
 
         # Both roles: a quick operational pulse -- neither tile exposes
         # costs, so there is no permission gate here (see view_cost_data).
@@ -347,13 +361,16 @@ class DailyStatsScreen(QWidget):
         self._tile_discounts.set_value(format_egp(report.discount_total_piasters))
         cash_stat = report.payment_methods.get("cash")
         instapay_stat = report.payment_methods.get("instapay")
+        credit_stat = report.payment_methods.get("credit")
         self._tile_cash.set_value(format_egp(cash_stat.total_piasters if cash_stat else 0))
         self._tile_instapay.set_value(format_egp(instapay_stat.total_piasters if instapay_stat else 0))
+        self._tile_credit.set_value(format_egp(credit_stat.total_piasters if credit_stat else 0))
 
         if self._is_owner:
             self._tile_expenses.set_value(format_egp(report.expenses_total_piasters))
             self._tile_net_today.set_value(format_egp(report.profit_piasters))
             self._tile_gross_profit.set_value(format_egp(report.gross_profit_piasters))
+            self._refresh_external_backup_tile()
 
         cash_in_drawer = self._safe(lambda: drawer_service.expected_cash_piasters(self._conn))
         self._tile_cash_in_drawer.set_value(
@@ -383,6 +400,19 @@ class DailyStatsScreen(QWidget):
         self._vs_last_week_label.setProperty("role", vs_last_week_role)
         self._vs_last_week_label.style().unpolish(self._vs_last_week_label)
         self._vs_last_week_label.style().polish(self._vs_last_week_label)
+
+    def _refresh_external_backup_tile(self) -> None:
+        def _status():
+            values = settings_repo.get_all(self._conn)
+            secondary_text = values.get("backup_folder_secondary") or ""
+            secondary_dir = Path(secondary_text) if secondary_text else None
+            warning_days = int(values.get("backup_warning_days") or "2")
+            return backup_service.external_backup_status(self._conn, utc_now(), secondary_dir, warning_days)
+
+        status = self._safe(_status) or "missing"
+        self._tile_external_backup.set_value(
+            _EXTERNAL_BACKUP_LABELS.get(status, status), role=_EXTERNAL_BACKUP_ROLES.get(status, "title")
+        )
 
     def _render_charts(self, report) -> None:
         self._hourly_chart.set_values(

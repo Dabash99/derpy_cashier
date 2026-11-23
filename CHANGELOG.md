@@ -1,5 +1,24 @@
 # سجل التغييرات / Changelog
 
+## Unreleased (Phase 11)
+
+### بالعربي
+
+- سجل العمليات (Audit log): شاشة جديدة للمالك فقط تعرض كل العمليات
+  الحساسة (تسجيل دخول، إبطال فاتورة، خصومات، تعديل أسعار، مصروفات،
+  الخزنة، النسخ الاحتياطي، ...) مع فلاتر بالتاريخ والمستخدم والعملية
+  والخطورة، وتفاصيل قبل/بعد، وتصدير CSV/Excel. السجل لا يُحذف تلقائيًا
+  أبدًا، ومحمي داخل قاعدة البيانات نفسها من أي تعديل أو حذف.
+
+### English
+
+- Audit log (سجل العمليات): a new owner-only screen listing every
+  sensitive action (logins, voids, discounts, price changes, expenses,
+  drawer moves, backups, ...) with date/user/action/severity filters,
+  before/after detail, and CSV/Excel export. The log is never
+  auto-deleted and is protected at the database level against any
+  update or delete.
+
 ## 1.1.0 — 2026-11-22
 
 ### بالعربي

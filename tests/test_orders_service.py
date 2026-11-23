@@ -217,7 +217,7 @@ def test_correct_owner_pin_approves_and_logs_both_users(db_conn, owner, cashier,
         "SELECT * FROM audit_log WHERE action = 'discount_applied'"
     ).fetchone()
     assert log_row["user_id"] == cashier["id"]
-    assert "approved_by={0}".format(owner["id"]) in log_row["details"]
+    assert '"approved_by": {0}'.format(owner["id"]) in log_row["details_json"]
 
 
 def test_wrong_owner_pin_counts_toward_global_lockout(db_conn, owner, cashier, table, product):

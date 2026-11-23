@@ -10,18 +10,23 @@ import os
 import re
 import shutil
 import sqlite3
+from datetime import timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from derby import __version__ as APP_VERSION
 from derby.core.db import backup_log_repo
 from derby.core.i18n import ar
+from derby.core.utils.time_utils import parse_utc_iso
 
 SNAPSHOT_TABLES = ("users", "orders", "order_items", "expenses", "ps_sessions")
 
 DAILY_FILENAME_PATTERN = re.compile(r"^derby-\d{4}-\d{2}-\d{2}\.db$")
 MANUAL_FILENAME_PATTERN = re.compile(r"^derby-manual-\d{8}-\d{6}\.db$")
+MONTHLY_FILENAME_PATTERN = re.compile(r"^derby-monthly-\d{4}-\d{2}\.db$")
 
 MANUAL_KEEP_COUNT = 10
+MIN_VALID_BACKUP_SIZE_BYTES = 1
 
 
 class BackupError(Exception):
@@ -53,6 +58,10 @@ def daily_file_name(business_date_iso: str) -> str:
 
 def manual_file_name(now) -> str:
     return "derby-manual-{0}.db".format(now.strftime("%Y%m%d-%H%M%S"))
+
+
+def monthly_file_name(year_month: str) -> str:
+    return "derby-monthly-{0}.db".format(year_month)
 
 
 def take_snapshot(conn: sqlite3.Connection) -> Dict:
@@ -189,6 +198,43 @@ def rotate_backups(folder: Path, pattern: "re.Pattern", keep_count: int) -> List
     return deleted
 
 
+def apply_retention_policy(
+    folder: Optional[Path], keep_daily: int, keep_monthly: int, keep_manual: int = MANUAL_KEEP_COUNT
+) -> int:
+    """"حذف النسخ القديمة حسب السياسة" -- re-applies the current
+    daily/monthly/manual retention settings to one backup folder right
+    now (rather than waiting for the next backup to trigger rotation),
+    e.g. right after the owner lowers backup_keep_count, or for an
+    external drive that has not received a fresh backup in a while.
+    Only ever touches files matching one of the three Derby backup
+    filename patterns inside an app-managed backup folder -- nothing
+    else there is ever looked at. Returns how many files were deleted.
+    """
+    if folder is None or not folder.exists():
+        return 0
+    deleted = []
+    deleted += rotate_backups(folder, DAILY_FILENAME_PATTERN, keep_daily)
+    deleted += rotate_backups(folder, MONTHLY_FILENAME_PATTERN, keep_monthly)
+    deleted += rotate_backups(folder, MANUAL_FILENAME_PATTERN, keep_manual)
+    return len(deleted)
+
+
+def external_backup_status(conn: sqlite3.Connection, now, secondary_dir: Optional[Path], warning_days: int) -> str:
+    """"آخر نسخة خارجية" dashboard indicator: 'missing' (red) if there is
+    no external folder configured or it has never produced a verified
+    backup, 'warning' (amber) if the last verified one is older than
+    warning_days, otherwise 'ok' (green)."""
+    if secondary_dir is None:
+        return "missing"
+    last = backup_log_repo.last_verified_backup(conn, "secondary")
+    if last is None:
+        return "missing"
+    age = now - parse_utc_iso(last["at_utc"])
+    if age > timedelta(days=warning_days):
+        return "warning"
+    return "ok"
+
+
 def test_folder_writable(folder: Path) -> bool:
     try:
         folder.mkdir(parents=True, exist_ok=True)
@@ -231,10 +277,52 @@ def run_backup_to_target(
             verify_backup(dest_path, expected_snapshot)
         sha256 = compute_sha256(dest_path)
         size_bytes = dest_path.stat().st_size
+        if size_bytes < MIN_VALID_BACKUP_SIZE_BYTES:
+            raise BackupError(ar.BACKUP_ERROR_EMPTY_FILE)
         rotate_backups(target_dir, rotation_pattern, keep_count)
         return TargetOutcome(status="ok", path=str(dest_path), size_bytes=size_bytes, sha256=sha256, verified=True)
     except Exception as error:  # noqa: BLE001 -- recorded, never propagated past one target
         return TargetOutcome(status="failed", path=str(dest_path), error=str(error))
+
+
+def maybe_create_monthly_snapshot(
+    conn: sqlite3.Connection,
+    db_path: Path,
+    year_month: str,
+    primary_dir: Optional[Path],
+    secondary_dir: Optional[Path],
+    primary_daily: TargetOutcome,
+    secondary_daily: TargetOutcome,
+    keep_count_monthly: int,
+) -> None:
+    """Once per calendar month, mirrors that day's already-verified daily
+    backup into a separate derby-monthly-YYYY-MM.db snapshot, kept under
+    its own retention (settings.backup_monthly_keep_count, default 12 --
+    "keep last N daily + M monthly"). A no-op once this month's snapshot
+    already exists (first daily closing of the month wins); never raises
+    -- a failure here must never block the daily closing itself.
+    """
+    monthly_name = monthly_file_name(year_month)
+    pairs = ((primary_dir, primary_daily), (secondary_dir, secondary_daily))
+    for target_dir, daily_outcome in pairs:
+        if target_dir is None or daily_outcome.status != "ok" or daily_outcome.path is None:
+            continue
+        monthly_path = target_dir / monthly_name
+        if monthly_path.exists():
+            continue
+        # Deliberately NOT written to backup_log: that table (and every
+        # "last verified backup" query over it -- exit_backup_is_due,
+        # the dashboard's external-backup tile, retry_secondary_backup)
+        # means "the most recent real daily/manual backup", and must
+        # keep meaning exactly that. A monthly archival copy is an
+        # internal retention artifact, not a new backup EVENT -- its
+        # existence on disk (and the retention policy's own pattern
+        # match) is its record; nothing here ever reads it back as a
+        # row to decide freshness.
+        run_backup_to_target(
+            db_path, target_dir, monthly_name, {}, MONTHLY_FILENAME_PATTERN, keep_count_monthly,
+            source_file_to_copy=Path(daily_outcome.path),
+        )
 
 
 def run_backup_pair(
@@ -275,7 +363,9 @@ def run_backup_pair(
 
 
 def _log(conn: sqlite3.Connection, kind: str, target: str, outcome: TargetOutcome) -> None:
+    schema_version = conn.execute("PRAGMA user_version").fetchone()[0]
     backup_log_repo.log_backup(
         conn, kind, target, outcome.status, path=outcome.path, size_bytes=outcome.size_bytes,
         sha256=outcome.sha256, verified=outcome.verified, error=outcome.error,
+        app_version=APP_VERSION, schema_version=schema_version,
     )

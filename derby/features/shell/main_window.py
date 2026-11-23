@@ -11,8 +11,10 @@ from PySide2.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLay
 
 from derby.core.db import settings_repo
 from derby.core.i18n import ar
+from derby.features.audit.audit_log_screen import AuditLogScreen
 from derby.features.auth import permissions
 from derby.features.closing.closing_banner import ClosingBannerWidget
+from derby.features.customers.customers_screen import CustomersScreen
 from derby.features.dashboard.daily_stats_screen import DailyStatsScreen
 from derby.features.expenses.expenses_screen import ExpensesScreen
 from derby.features.inventory.drawer_screen import DrawerScreen
@@ -27,6 +29,7 @@ from derby.features.shell.header import Header
 from derby.features.shell.idle_filter import IdleTimer
 from derby.features.shell.placeholder_screen import PlaceholderScreen
 from derby.features.shell.sidebar import SECTIONS, Sidebar
+from derby.features.shifts.shifts_employees_screen import ShiftsEmployeesScreen
 from derby.features.supplies.supplies_screen import SuppliesScreen
 from derby.features.tables.tables_screen import TablesScreen
 
@@ -119,6 +122,12 @@ class MainWindow(QMainWindow):
                 widget = DrawerScreen(self._conn, self._user)
             elif key == "reports":
                 widget = ReportsScreen(self._conn, self._user)
+            elif key == "audit_log":
+                widget = AuditLogScreen(self._conn, self._user)
+            elif key == "shifts_employees":
+                widget = ShiftsEmployeesScreen(self._conn, self._user)
+            elif key == "customers":
+                widget = CustomersScreen(self._conn, self._user)
             else:
                 widget = PlaceholderScreen(phase)
             self._content_stack.addWidget(widget)

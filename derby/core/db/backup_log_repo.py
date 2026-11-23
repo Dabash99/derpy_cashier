@@ -20,14 +20,19 @@ def log_backup(
     sha256: Optional[str] = None,
     verified: bool = False,
     error: Optional[str] = None,
+    app_version: Optional[str] = None,
+    schema_version: Optional[int] = None,
     commit: bool = True,
 ) -> int:
     cursor = conn.execute(
         """
-        INSERT INTO backup_log (at_utc, kind, target, path, size_bytes, sha256, verified, status, error)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO backup_log (at_utc, kind, target, path, size_bytes, sha256, verified, status, error, app_version, schema_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (to_utc_iso(utc_now()), kind, target, path, size_bytes, sha256, 1 if verified else 0, status, error),
+        (
+            to_utc_iso(utc_now()), kind, target, path, size_bytes, sha256, 1 if verified else 0, status, error,
+            app_version, schema_version,
+        ),
     )
     if commit:
         conn.commit()

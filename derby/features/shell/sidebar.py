@@ -39,6 +39,9 @@ SECTIONS = [
     # tools/render_assets.py.
     ("supplies", ar.SIDEBAR_SUPPLIES, "expenses", None, permissions.view_supplies),
     ("reports", ar.SIDEBAR_REPORTS, "reports", None, permissions.can_access_reports),
+    ("customers", ar.SIDEBAR_CUSTOMERS, "user", None, permissions.view_customers),
+    ("shifts_employees", ar.SIDEBAR_SHIFTS_EMPLOYEES, "cashier", None, permissions.view_shift_report),
+    ("audit_log", ar.SIDEBAR_AUDIT_LOG, "reports", None, permissions.view_audit_log),
     ("settings", ar.SIDEBAR_SETTINGS, "settings", None, permissions.can_access_settings),
 ]
 
