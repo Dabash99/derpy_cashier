@@ -72,6 +72,22 @@ updates" button. See the [English summary](#english-summary) below.
   من داخل البرنامج.
 - **فحص التحديثات**: زر واحد في الإعدادات — هو وتسليم رسالة واتساب فقط
   ما يلمس الإنترنت في البرنامج كله.
+- **العملاء والآجل**: بيع بالآجل لعميل، دفعات جزئية أو كاملة، كشف حساب
+  لكل عميل، وتذكير واتساب بالرصيد المستحق — دون التأثير على الكاش
+  المتوقع في الخزنة إلا عند تحصيل الدفعة.
+- **الورديات والموظفين**: فتح/إغلاق وردية بتسليم مباشر للكاشير التالي،
+  بصمة حضور وانصراف بالرقم السري، وكشف مرتبات شهري (سلف ومكافآت
+  وخصومات) يتحول تلقائيًا لمصروف.
+- **سجل العمليات**: سجل لا يُعدَّل ولا يُحذف (مالك فقط) لكل عملية مهمة
+  — بيع، خصم، تعديل سعر، نسخة احتياطية، إقفال — مع تفاصيل قبل/بعد.
+- **النسخ الاحتياطية المحسّنة**: تحقق تلقائي من كل نسخة (integrity
+  check)، نسخ خارجية لمجلد ثانٍ/فلاشة مع إعادة محاولة لو الفلاشة غير
+  موصولة، وسياسة احتفاظ بعدد محدد من النسخ اليومية والشهرية.
+- **تنبيهات وإعادة الطلب**: تنبيهات على الشاشة الرئيسية (مخزون منخفض،
+  آجل متأخر، خزنة لم تُفتح، نسخة احتياطية قديمة...)، وقائمة إعادة طلب
+  جاهزة للمورّدين مباشرة من المخزون المنخفض.
+- **خصومات معدّة مسبقًا**: خصومات باسم وقيمة ثابتة يختارها الكاشير
+  بسرعة عند الدفع، بدل كتابة خصم حر في كل مرة.
 
 </div>
 
@@ -316,10 +332,15 @@ PlayStation hourly billing (Single/Multi, live timer, per-line
 rounding), menu with add-ons and CSV import/export, inventory with
 recipes/cost/margin, purchases & suppliers, expenses (incl. recurring),
 daily/monthly/custom-range reports with Excel/CSV/PDF export, a profit
-report, a cash drawer screen, a home dashboard, daily closing with an
-automatic backup and a WhatsApp report hand-off, owner/cashier roles
-with PIN auth, backup/restore, and a single manual "check for
-updates" button — the app's only other network request.
+report, a cash drawer screen, a home dashboard with an alerts center
+and reorder list, daily closing with an automatic backup and a
+WhatsApp report hand-off, owner/cashier roles with PIN auth,
+customers & credit sales (آجل) with statements and WhatsApp payment
+reminders, shifts with handover and a monthly payroll sheet
+(attendance, advances, bonuses, deductions), an append-only audit
+log, verified/retained backups with external-drive copy and
+restore, preset discounts, and a single manual "check for updates"
+button — the app's only other network request.
 
 **Install**: download the latest installer from the
 [GitHub Releases page](https://github.com/Dabash99/derpy_cashier/releases/latest),
