@@ -118,6 +118,13 @@ def count_running_sessions(conn: sqlite3.Connection) -> int:
     return row["n"]
 
 
+def list_running_sessions(conn: sqlite3.Connection) -> List[sqlite3.Row]:
+    """Every currently-running session across all devices -- used by the
+    الرئيسية alerts center's "long session" check, which needs each
+    one's started_at_utc/device_name_snapshot, not just a count."""
+    return conn.execute("SELECT * FROM ps_sessions WHERE stopped_at_utc IS NULL ORDER BY started_at_utc").fetchall()
+
+
 def list_stopped_sessions_without_order_item(conn: sqlite3.Connection) -> List[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM ps_sessions WHERE stopped_at_utc IS NOT NULL AND order_item_id IS NULL ORDER BY id"

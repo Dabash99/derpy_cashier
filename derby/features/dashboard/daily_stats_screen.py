@@ -35,6 +35,7 @@ from derby.core.utils.time_utils import utc_now
 from derby.features.auth import permissions
 from derby.features.closing import backup_service
 from derby.features.dashboard import daily_stats_service
+from derby.features.dashboard.alerts_center import AlertsCenter
 from derby.features.dashboard.hourly_bar_chart import HourlyBarChart
 from derby.features.dashboard.open_orders_panel import OpenOrdersPanel
 from derby.features.inventory import drawer_service
@@ -165,6 +166,12 @@ class DailyStatsScreen(QWidget):
         self._new_invoice_button.setProperty("variant", "primary")
         self._new_invoice_button.clicked.connect(self._on_new_invoice)
         outer.addWidget(self._new_invoice_button)
+
+        self._alerts_center = None
+        if self._is_owner:
+            self._alerts_center = AlertsCenter(self._conn)
+            self._alerts_center.navigate_requested.connect(self.navigate_requested.emit)
+            outer.addWidget(self._alerts_center)
 
         date_row = QHBoxLayout()
         self._prev_button = QPushButton(ar.DASHBOARD_PREV_DAY_BUTTON)
@@ -342,6 +349,8 @@ class DailyStatsScreen(QWidget):
     # --- rendering -----------------------------------------------------
 
     def reload(self) -> None:
+        if self._alerts_center is not None:
+            self._safe(self._alerts_center.reload)
         today = report_service.today_business_date(self._conn)
         stats = daily_stats_service.build_daily_stats(self._conn, self._selected_date, today=today)
         report = stats.report

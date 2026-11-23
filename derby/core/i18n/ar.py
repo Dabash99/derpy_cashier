@@ -778,6 +778,7 @@ DISCOUNT_PRESETS_ERROR_NAME_REQUIRED = "اسم الخصم مطلوب"
 
 ALERTS_CENTER_TITLE = "تنبيهات"
 ALERTS_CENTER_EMPTY = "لا توجد تنبيهات حاليًا"
+ALERTS_CENTER_VIEW_BUTTON = "عرض"
 ALERT_PS_LONG_SESSION = "جلسة بلايستيشن {device} شغالة من أكثر من {hours} ساعة"
 ALERT_CUSTOMER_OVERDUE = "{count} عميل متأخر في السداد"
 ALERT_BACKUP_OVERDUE = "النسخة الاحتياطية الخارجية متأخرة"
