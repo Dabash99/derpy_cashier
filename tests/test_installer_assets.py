@@ -36,7 +36,12 @@ def test_wizard_small_image_is_55x55_bmp():
 
 def test_derby_iss_exists_and_has_required_directives():
     text = (INSTALLER_DIR / "derby.iss").read_text(encoding="utf-8")
-    assert "ArchitecturesAllowed=x64compatible" in text
+    lines = text.splitlines()
+    # The build produces a 32-bit binary (venv32) that runs unmodified under
+    # WOW64, so the installer must not restrict architectures (comments
+    # mentioning why are fine -- only an actual directive line is checked).
+    assert not any(line.startswith("ArchitecturesAllowed=") for line in lines)
+    assert not any(line.startswith("ArchitecturesInstallIn64BitMode=") for line in lines)
     assert "MinVersion=6.1sp1" in text
     # The leading "{" is deliberately doubled ("{{") -- {#MyAppId} already
     # expands to a brace-enclosed GUID, and Inno Setup's runtime constant
@@ -76,9 +81,9 @@ def test_version_iss_defines_my_app_version_matching_derby_version():
     assert 'MyAppVersion "{0}"'.format(derby.__version__) in text
 
 
-def test_redist_placeholder_or_real_file_present():
-    redist_dir = INSTALLER_DIR / "redist"
-    assert redist_dir.exists()
-    has_real_file = (redist_dir / "vc_redist.x64.exe").exists()
-    has_placeholder = (redist_dir / "PLACEHOLDER.md").exists()
-    assert has_real_file or has_placeholder
+def test_derby_iss_has_no_x64_vc_redist_bundling():
+    """The app is a 32-bit build with its own bundled UCRT DLLs (see
+    tools/build.py) -- it must never try to install the x64 VC++ redist."""
+    text = (INSTALLER_DIR / "derby.iss").read_text(encoding="utf-8")
+    assert "vc_redist.x64.exe" not in text
+    assert "VCRedist" not in text

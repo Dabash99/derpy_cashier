@@ -42,12 +42,10 @@ DisableProgramGroupPage=yes
 ; there to click it in an automated/headless run).
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=commandline
-; "x64compatible" (Inno Setup 6.3+) is the recommended identifier over
-; the deprecated "x64" -- matches real x64 Windows (7 SP1, 10) without
-; pulling in ARM64's x64 emulation layer, which this project doesn't
-; target or test.
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+; No ArchitecturesAllowed/ArchitecturesInstallIn64BitMode: the app is
+; built as a 32-bit binary (venv32, see tools/build.py) so it runs
+; unmodified on both Windows 7 SP1 32-bit and 64-bit, and on Windows 10
+; 64-bit under WOW64 -- a 32-bit-only installer needs neither directive.
 MinVersion=6.1sp1
 OutputDir=..\release
 OutputBaseFilename=Derby-Setup-{#MyAppVersion}
@@ -80,8 +78,8 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 ; not bundled -- see the [Languages] section above).
 [CustomMessages]
 en.UninstallDataNotice=إلغاء تثبيت ديربي لن يحذف بياناتك: قاعدة البيانات والنسخ الاحتياطية والصور والإيصالات تبقى في مكانها (مجلد %APPDATA%\Derby ومجلد Documents\Derby). فقط ملفات البرنامج نفسها سيتم حذفها.
-en.MissingVCRedist=برنامج ديربي يحتاج إلى Microsoft Visual C++ 2015-2019 Redistributable (x64)، ولم يتم العثور عليه على هذا الجهاز ولم يمكن تثبيته تلقائيًا. من فضلك ثبّته من https://aka.ms/vs/17/release/vc_redist.x64.exe ثم أعد تشغيل هذا المثبت.
-en.MissingUCRT=هذا جهاز يعمل بنظام Windows 7، ويبدو أن تحديث Universal C Runtime (KB2999226) غير مثبّت -- برنامج ديربي لن يعمل بدونه. من فضلك ثبّت KB2999226 (أو تحديث تراكمي أحدث يتضمنه) من Windows Update، ثم أعد تشغيل هذا المثبت.
+en.UCRTWarning=هذا جهاز يعمل بنظام Windows 7، وتعذّر التأكد من وجود تحديث Universal C Runtime (KB2999226) ومن ملفات التشغيل المرفقة مع البرنامج في نفس الوقت. سيتم إكمال التثبيت، ولو واجهت مشكلة عند تشغيل ديربي فثبّت KB2999226 (أو تحديث تراكمي أحدث يتضمنه) من Windows Update.
+en.AddDllDirectoryWarning=هذا جهاز يعمل بنظام Windows 7، ويبدو أن تحديث AddDllDirectory (KB2533623) غير مثبّت على هذا الجهاز. سيتم إكمال التثبيت، ولكن لتشغيل ديربي بشكل موثوق من فضلك ثبّت KB2533623 (النسخة المناسبة x86 أو x64) من Windows Update قبل تشغيل البرنامج.
 
 [Tasks]
 ; Tasks are checked by default unless "unchecked" is given -- there is
@@ -91,7 +89,6 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\dist\Derby\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: dontcopy skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\Derby"; Filename: "{app}\{#MyAppExeName}"
@@ -107,19 +104,6 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,Derby}"; Flag
 ; (the Program Files install folder) is ever touched by uninstall.
 
 [Code]
-const
-  { HKLM\...\VisualStudio\14.0\VC\Runtimes\x64 "Installed"=1 is how the
-    VC++ 2015-2019 (vc14x, "Universal CRT" successor) x64 redist
-    registers itself. }
-  VCRedistRegKey = 'SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
-
-function IsVCRedistInstalled(): Boolean;
-var
-  Installed: Cardinal;
-begin
-  Result := RegQueryDWordValue(HKEY_LOCAL_MACHINE, VCRedistRegKey, 'Installed', Installed) and (Installed = 1);
-end;
-
 function IsWindows7(): Boolean;
 var
   Version: TWindowsVersion;
@@ -128,64 +112,63 @@ begin
   Result := (Version.Major = 6) and (Version.Minor = 1);
 end;
 
-function IsUCRTInstalled(): Boolean;
+function IsUCRTAvailable(): Boolean;
+(* The frozen build (tools/build.py) bundles api-ms-win-crt-runtime-l1-1-0.dll
+   and the rest of the UCRT forwarder DLLs directly next to Derby.exe, so the
+   app works even on a Windows 7 box that never got KB2999226 -- Windows 7
+   has no API Set resolver, so these are just plain DLLs resolved from the
+   app's own install directory first. That install directory is still empty
+   at this point (this runs before the Files section copies anything), so
+   the check below looks at the installer's own source payload instead -- it
+   tells us whether this exact build carries its own copy. It falls back to
+   the Windows system directory copy, in case this build somehow didn't
+   bundle them, so an already-updated Windows 7 machine is still recognized
+   as fine. Registry-based detection of KB2999226 itself is not used here
+   because it is unreliable across cumulative updates -- this DLL-presence
+   check is what actually determines whether the app can start. *)
+var
+  SourceDllPath, SystemDllPath: string;
 begin
-  { KB2999226 (or a later cumulative update that folds it in) installs
-    ucrtbase.dll into System32 -- its presence is a reliable, simple
-    proxy for "the UCRT update is installed" without parsing the
-    installed-updates list. }
-  Result := FileExists(ExpandConstant('{sys}\ucrtbase.dll'));
+  SourceDllPath := ExpandConstant('{src}\..\dist\Derby\api-ms-win-crt-runtime-l1-1-0.dll');
+  SystemDllPath := ExpandConstant('{sys}\api-ms-win-crt-runtime-l1-1-0.dll');
+  Result := FileExists(SourceDllPath) or FileExists(SystemDllPath);
 end;
 
-procedure TryInstallBundledVCRedist();
-var
-  ResultCode: Integer;
-begin
-  { ExtractTemporaryFile is a procedure (no return value) -- it raises an
-    exception on failure rather than returning False, so this is wrapped
-    in try/except and the file's actual presence is checked afterward. }
-  try
-    ExtractTemporaryFile('vc_redist.x64.exe');
-  except
-    { Fall through to the manual message below. }
-  end;
+function AddDllDirectory(const NewDirectory: string): Longint;
+  external 'AddDllDirectory@kernel32.dll stdcall delayload';
 
-  if FileExists(ExpandConstant('{tmp}\vc_redist.x64.exe')) then
-    Exec(ExpandConstant('{tmp}\vc_redist.x64.exe'), '/install /quiet /norestart', '', SW_SHOW,
-      ewWaitUntilTerminated, ResultCode);
+function IsAddDllDirectoryAvailable(): Boolean;
+(* AddDllDirectory() itself only exists in kernel32.dll on Windows 7 once
+   KB2533623 is installed (it ships natively from Windows 8 on). The
+   "delayload" import above means the function is resolved the first time
+   it is actually called, not at process start -- so calling it here, in a
+   try/except, is the only way in Pascal Script to detect whether the
+   export exists without crashing the installer outright on a Windows 7
+   box that is missing it. Passing a real, harmless directory ({sys}) means
+   a genuinely available API call succeeds normally. *)
+begin
+  Result := True;
+  try
+    AddDllDirectory(ExpandConstant('{sys}'));
+  except
+    Result := False;
+  end;
 end;
 
 function InitializeSetup(): Boolean;
 begin
   Result := True;
 
-  if IsWindows7() and not IsUCRTInstalled() then
-  begin
-    MsgBox(CustomMessage('MissingUCRT'), mbError, MB_OK);
-    Result := False;
-    exit;
-  end;
+  { Both checks below are non-blocking: a heads-up only, never a reason to
+    refuse to install -- derby/__main__.py's own os.add_dll_directory
+    fallback (see docs/WIN7-CHECKLIST.md) means the app can still start
+    without either update, and the app almost always carries its own UCRT
+    DLLs regardless of what Windows Update has applied. }
+  if IsWindows7() and not IsUCRTAvailable() then
+    MsgBox(CustomMessage('UCRTWarning'), mbInformation, MB_OK);
 
-  if not IsVCRedistInstalled() then
-  begin
-    { Only ever runs a redistributable that ships IN this installer's own
-      source tree -- never downloads anything, per this project's
-      no-networking rule. }
-    if FileExists(ExpandConstant('{src}\redist\vc_redist.x64.exe')) then
-      TryInstallBundledVCRedist()
-    else
-    begin
-      MsgBox(CustomMessage('MissingVCRedist'), mbError, MB_OK);
-      Result := False;
-      exit;
-    end;
-
-    if not IsVCRedistInstalled() then
-    begin
-      MsgBox(CustomMessage('MissingVCRedist'), mbError, MB_OK);
-      Result := False;
-    end;
-  end;
+  if IsWindows7() and not IsAddDllDirectoryAvailable() then
+    MsgBox(CustomMessage('AddDllDirectoryWarning'), mbInformation, MB_OK);
 end;
 
 procedure InitializeUninstallProgressForm();
