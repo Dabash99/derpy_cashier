@@ -26,6 +26,7 @@ from derby.core.db import (
     settings_repo,
     shifts_repo,
 )
+from derby.core.events import bus
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import utc_now
@@ -155,6 +156,7 @@ def credit_sale(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
 
     audit_service.log(
         conn, "credit_sale", user=requesting_user, entity_type="customer", entity_id=customer_id,
@@ -221,6 +223,7 @@ def record_payment(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
 
     audit_service.log(
         conn, "customer_payment_recorded", user=requesting_user, entity_type="customer", entity_id=customer_id,

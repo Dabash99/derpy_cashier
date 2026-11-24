@@ -21,13 +21,14 @@ from derby.core.i18n import ar
 from derby.core.integrations import whatsapp
 from derby.core.theme.table_style import centered_item, configure_table, mark_as_danger, right_item
 from derby.core.utils.money import format_egp, parse_egp_input
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo, utc_now
 from derby.features.customers import customer_service
 from derby.features.customers.customer_statement_dialog import CustomerStatementDialog
 from derby.features.customers.exceptions import CustomerError
 
 
-class CustomersScreen(QWidget):
+class CustomersScreen(RefreshOnChangeMixin, QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
@@ -36,6 +37,7 @@ class CustomersScreen(QWidget):
         self._selected_customer_id = None
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)

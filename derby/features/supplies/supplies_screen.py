@@ -25,6 +25,7 @@ from derby.core.i18n import ar
 from derby.core.integrations import whatsapp
 from derby.core.theme.styled import enable_styled_background
 from derby.core.utils.money import format_egp
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo
 from derby.features.auth import permissions
 from derby.features.supplies import supplies_service
@@ -43,13 +44,14 @@ def _user_name(conn: sqlite3.Connection, user_id) -> str:
     return user["name"] if user is not None else ""
 
 
-class SuppliesScreen(QWidget):
+class SuppliesScreen(RefreshOnChangeMixin, QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
         self._user = user
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)

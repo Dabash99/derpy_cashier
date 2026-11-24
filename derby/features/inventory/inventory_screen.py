@@ -22,6 +22,7 @@ from derby.core.i18n import ar
 from derby.core.theme.tab_bar import configure_tab_widget
 from derby.core.theme.table_style import centered_item, configure_table, fit_table_height, right_item
 from derby.core.utils.money import format_egp
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.core.utils.time_utils import utc_now
 from derby.features.inventory import stock_service
 from derby.features.inventory.inventory_dialogs import (
@@ -41,13 +42,14 @@ from derby.features.reports.export_service import (
 )
 
 
-class InventoryScreen(QWidget):
+class InventoryScreen(RefreshOnChangeMixin, QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
         self._user = user
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)

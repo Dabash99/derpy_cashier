@@ -16,6 +16,7 @@ from typing import Dict, Optional
 
 from derby.core import audit_service
 from derby.core.db import drawer_repo, orders_repo, shifts_repo
+from derby.core.events import bus
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import to_utc_iso, utc_now
@@ -117,6 +118,7 @@ def open_shift(conn: sqlite3.Connection, requesting_user: sqlite3.Row, opening_c
         summary_ar="فتح وردية برصيد افتتاحي {0}".format(format_egp(opening_cash_piasters)),
         details={"opening_cash_piasters": opening_cash_piasters},
     )
+    bus.notify()
     return shifts_repo.get_shift(conn, shift_id)
 
 
@@ -150,6 +152,7 @@ def close_shift(
         },
         severity=audit_service.SEVERITY_WARNING if difference != 0 else audit_service.SEVERITY_INFO,
     )
+    bus.notify()
     return closed_shift, report
 
 

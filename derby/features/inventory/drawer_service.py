@@ -17,6 +17,7 @@ import sqlite3
 from typing import Dict, List, Optional
 
 from derby.core.db import audit_repo, drawer_repo
+from derby.core.events import bus
 from derby.features.inventory.exceptions import InventoryError, NoteRequiredError, OpeningBalanceRequiredError
 
 
@@ -57,6 +58,7 @@ def open_drawer(conn: sqlite3.Connection, opening_amount_piasters: int, user_id:
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return conn.execute("SELECT * FROM drawer_entries WHERE id = ?", (entry_id,)).fetchone()
 
 
@@ -79,6 +81,7 @@ def record_deposit(conn: sqlite3.Connection, amount_piasters: int, note: str, us
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return conn.execute("SELECT * FROM drawer_entries WHERE id = ?", (entry_id,)).fetchone()
 
 
@@ -94,6 +97,7 @@ def record_withdrawal(conn: sqlite3.Connection, amount_piasters: int, note: str,
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return conn.execute("SELECT * FROM drawer_entries WHERE id = ?", (entry_id,)).fetchone()
 
 
@@ -112,6 +116,7 @@ def record_cash_refund(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return conn.execute("SELECT * FROM drawer_entries WHERE id = ?", (entry_id,)).fetchone()
 
 
@@ -146,6 +151,7 @@ def record_count(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return conn.execute("SELECT * FROM drawer_counts WHERE id = ?", (count_id,)).fetchone()
 
 

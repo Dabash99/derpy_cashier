@@ -27,6 +27,7 @@ from derby.core.i18n import ar
 from derby.core.theme.tab_bar import configure_tab_widget
 from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.money import format_egp, piasters_to_plain_text
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.features.expenses import expenses_service
 from derby.features.expenses.expense_categories_panel import ExpenseCategoriesPanel
 from derby.features.expenses.expense_dialog import ExpenseDialog
@@ -45,7 +46,7 @@ def _month_bounds(year_month: str):
     return date(year, month, 1).isoformat(), date(year, month, last_day).isoformat()
 
 
-class ExpensesScreen(QWidget):
+class ExpensesScreen(RefreshOnChangeMixin, QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
@@ -53,6 +54,7 @@ class ExpensesScreen(QWidget):
         self._rows_by_table_row = []
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
         self.check_recurring_due()
 
     def _build_ui(self) -> None:

@@ -28,6 +28,7 @@ from derby.core.db import (
     stock_items_repo,
     stock_movements_repo,
 )
+from derby.core.events import bus
 from derby.core.utils.business_date import business_date as _compute_business_date
 from derby.core.utils.time_utils import utc_now
 from derby.features.inventory.exceptions import InvalidQuantityError, WasteReasonRequiredError
@@ -109,6 +110,7 @@ def record_purchase(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return purchases_repo.get_purchase(conn, purchase_id)
 
 
@@ -143,6 +145,7 @@ def mark_purchase_paid(conn: sqlite3.Connection, purchase_id: int, user_id: int)
     try:
         _file_purchase_expense(conn, purchase_id, purchase["total_cost_piasters"], purchase["purchase_date"], user_id)
         audit_repo.log(conn, "purchase_marked_paid", user_id=user_id, details="purchase={0}".format(purchase_id))
+        bus.notify()
     except Exception:
         conn.rollback()
         raise
@@ -268,6 +271,7 @@ def record_waste(conn: sqlite3.Connection, stock_item_id: int, qty: float, reaso
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return stock_items_repo.get_stock_item(conn, stock_item_id)
 
 
@@ -296,6 +300,7 @@ def record_stocktake(conn: sqlite3.Connection, stock_item_id: int, counted_qty: 
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return stock_items_repo.get_stock_item(conn, stock_item_id)
 
 

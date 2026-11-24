@@ -19,6 +19,7 @@ from derby.core.db import (
     recurring_expenses_repo,
     settings_repo,
 )
+from derby.core.events import bus
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.time_utils import utc_now
 from derby.features.expenses import receipts
@@ -82,6 +83,7 @@ def create_expense(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return expenses_repo.get_expense(conn, expense_id)
 
 
@@ -104,6 +106,7 @@ def void_expense(conn: sqlite3.Connection, expense_id: int, reason: str, user_id
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return expenses_repo.get_expense(conn, expense_id)
 
 
@@ -152,6 +155,7 @@ def replace_expense(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return expenses_repo.get_expense(conn, new_id)
 
 

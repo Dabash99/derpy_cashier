@@ -27,6 +27,7 @@ from derby.core.i18n import ar
 from derby.core.theme.styled import enable_styled_background
 from derby.core.theme.tab_bar import configure_tab_widget
 from derby.core.utils.money import format_egp
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo
 from derby.features.auth import permissions
 from derby.features.pos import orders_service
@@ -39,7 +40,7 @@ from derby.features.tables.tables_management_panel import TablesManagementPanel
 _GRID_COLUMNS = 4
 
 
-class TablesScreen(QWidget):
+class TablesScreen(RefreshOnChangeMixin, QWidget):
     order_opened = Signal(int)
     # A free table card was clicked -- unlike order_opened, no order row
     # exists yet (lazy creation: see PosScreen.open_table).
@@ -54,6 +55,7 @@ class TablesScreen(QWidget):
         self._user = user
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)

@@ -9,6 +9,7 @@ import sqlite3
 from typing import Optional
 
 from derby.core.db import audit_repo, orders_repo, ps_devices_repo, ps_sessions_repo, settings_repo
+from derby.core.events import bus
 from derby.core.i18n import ar
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo, to_utc_iso, utc_now
 from derby.features.playstation import pricing
@@ -58,6 +59,7 @@ def start_session(conn: sqlite3.Connection, device_id: int, mode: str, user_id: 
         user_id=user_id,
         details="device={0} order={1} mode={2}".format(device_id, order["id"], mode),
     )
+    bus.notify()
     return ps_sessions_repo.get_session(conn, session_id)
 
 
@@ -84,6 +86,7 @@ def switch_mode(conn: sqlite3.Connection, device_id: int, new_mode: str, user_id
         user_id=user_id,
         details="device={0} order={1} from={2} to={3}".format(device_id, running["order_id"], running["mode"], new_mode),
     )
+    bus.notify()
     return ps_sessions_repo.get_session(conn, session_id)
 
 
@@ -100,6 +103,7 @@ def stop_session(conn: sqlite3.Connection, device_id: int, user_id: int, now=Non
         user_id=user_id,
         details="device={0} order={1}".format(device_id, running["order_id"]),
     )
+    bus.notify()
     return ps_sessions_repo.get_session(conn, running["id"])
 
 

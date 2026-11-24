@@ -10,6 +10,7 @@ from PySide2.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
 
 from derby.core.i18n import ar
 from derby.core.theme.tab_bar import configure_tab_widget
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.features.auth import permissions
 from derby.features.employees.attendance_panel import AttendancePanel
 from derby.features.employees.employees_panel import EmployeesPanel
@@ -18,7 +19,7 @@ from derby.features.shifts.shift_panel import ShiftPanel
 from derby.features.shifts.shifts_history_panel import ShiftsHistoryPanel
 
 
-class ShiftsEmployeesScreen(QWidget):
+class ShiftsEmployeesScreen(RefreshOnChangeMixin, QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
@@ -49,6 +50,7 @@ class ShiftsEmployeesScreen(QWidget):
         tabs.currentChanged.connect(self._on_tab_changed)
         layout.addWidget(tabs)
         self._tabs = tabs
+        self._init_refresh_on_change()
 
     def _on_tab_changed(self, _index: int) -> None:
         widget = self._tabs.currentWidget()
@@ -56,4 +58,8 @@ class ShiftsEmployeesScreen(QWidget):
             widget.reload()
 
     def reload(self) -> None:
-        self._shift_panel.reload()
+        # Only the visible tab needs a live requery; the others reload
+        # lazily in _on_tab_changed when the user switches to them.
+        widget = self._tabs.currentWidget()
+        if hasattr(widget, "reload"):
+            widget.reload()

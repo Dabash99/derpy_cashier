@@ -24,6 +24,7 @@ from derby.core.db import (
     shifts_repo,
     users_repo,
 )
+from derby.core.events import bus
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.money import format_egp
 from derby.core.utils.time_utils import parse_utc_iso, utc_now
@@ -103,6 +104,8 @@ def auto_cancel_empty_open_orders(conn: sqlite3.Connection, actor_user_id: Optio
             conn.rollback()
             raise
         cancelled += 1
+    if cancelled:
+        bus.notify()
     return cancelled
 
 
@@ -173,6 +176,7 @@ def add_item(
                 orders_repo.update_item_qty(conn, merge_target["id"], new_qty, line_total, commit=False)
                 recompute_totals(conn, order_id, commit=False)
                 conn.commit()
+                bus.notify()
                 return orders_repo.get_order_item(conn, merge_target["id"])
 
         line_total = (unit_price + addon_total_per_unit) * qty
@@ -188,6 +192,7 @@ def add_item(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return orders_repo.get_order_item(conn, item_id)
 
 
@@ -222,6 +227,7 @@ def change_qty(conn: sqlite3.Connection, order_id: int, item_id: int, new_qty: i
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
 
 
 def remove_item(conn: sqlite3.Connection, order_id: int, item_id: int) -> None:
@@ -234,6 +240,7 @@ def remove_item(conn: sqlite3.Connection, order_id: int, item_id: int) -> None:
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
 
 
 def set_item_note(conn: sqlite3.Connection, order_id: int, item_id: int, note: Optional[str]) -> None:
@@ -275,6 +282,7 @@ def apply_discount(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     audit_service.log(
         conn, "discount_preset_used" if preset_name else "discount_applied", user=requesting_user,
         entity_type="order", entity_id=order_id,
@@ -305,6 +313,7 @@ def remove_discount(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     audit_service.log(
         conn, "discount_removed", user=requesting_user, entity_type="order", entity_id=order_id,
         summary_ar="إلغاء خصم عن فاتورة #{0}".format(order_id), details={"approved_by": approver_id},
@@ -337,6 +346,7 @@ def cancel(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return orders_repo.get_order(conn, order_id)
 
 
@@ -377,6 +387,7 @@ def pay(conn: sqlite3.Connection, order_id: int, payment_method: str, requesting
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return orders_repo.get_order(conn, order_id)
 
 
@@ -408,6 +419,7 @@ def void(conn: sqlite3.Connection, order_id: int, reason: str, requesting_user: 
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     if order["customer_id"] is not None:
         audit_service.log(
             conn, "credit_sale_void_reversed", user=requesting_user, entity_type="customer", entity_id=order["customer_id"],
@@ -468,6 +480,7 @@ def move_order(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return orders_repo.get_order(conn, order_id)
 
 
@@ -503,4 +516,5 @@ def remove_ps_item(
     except Exception:
         conn.rollback()
         raise
+    bus.notify()
     return orders_repo.get_order(conn, order_id)

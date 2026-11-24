@@ -26,6 +26,7 @@ from derby.core.i18n import ar
 from derby.core.theme.table_style import centered_item, configure_table, right_item
 from derby.core.utils.business_date import business_date as compute_business_date
 from derby.core.utils.money import format_egp
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo, utc_now
 from derby.features.auth import permissions
 from derby.features.pos import orders_service
@@ -47,7 +48,7 @@ def _method_key(order: sqlite3.Row) -> str:
     return order["payment_method"]
 
 
-class SalesLogScreen(QWidget):
+class SalesLogScreen(RefreshOnChangeMixin, QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
@@ -55,6 +56,7 @@ class SalesLogScreen(QWidget):
         self._can_view_all_dates = permissions.view_sales_all_dates(user["role"])
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
 
     def _today_business_date(self) -> str:
         close_time_text = settings_repo.get(self._conn, "business_close_time", "23:59") or "23:59"

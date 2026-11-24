@@ -25,6 +25,7 @@ from derby.core.db import drawer_repo, purchases_repo, stock_items_repo, users_r
 from derby.core.i18n import ar
 from derby.core.theme.table_style import centered_item, configure_table, fit_table_height, right_item
 from derby.core.utils.money import format_egp
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.core.utils.time_utils import parse_utc_iso, to_cairo, utc_now
 from derby.features.auth import permissions
 from derby.features.inventory import drawer_service, stock_service
@@ -49,7 +50,7 @@ _ENTRY_TYPE_LABELS = {
 }
 
 
-class DrawerScreen(QWidget):
+class DrawerScreen(RefreshOnChangeMixin, QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
@@ -57,6 +58,7 @@ class DrawerScreen(QWidget):
         self._is_owner = permissions.view_goods_review(user["role"])
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)

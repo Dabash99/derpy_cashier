@@ -39,6 +39,7 @@ from derby.core.theme.styled import enable_styled_background
 from derby.core.theme.tab_bar import configure_tab_widget
 from derby.core.theme.table_style import centered_item, configure_table, fit_table_height, right_item
 from derby.core.utils.money import format_egp
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.core.utils.time_utils import to_cairo, utc_now
 from derby.features.reports import report_service
 from derby.features.reports.export_panel import ExportPanel
@@ -77,7 +78,7 @@ class _TableSection:
         self.empty_label.setVisible(not rows)
 
 
-class ReportsScreen(QWidget):
+class ReportsScreen(RefreshOnChangeMixin, QWidget):
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
         super().__init__(parent)
         self._conn = conn
@@ -85,6 +86,7 @@ class ReportsScreen(QWidget):
         self._report = None
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)

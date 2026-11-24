@@ -29,6 +29,7 @@ from derby.core.theme import tokens
 from derby.core.theme.fonts import latin_numeric_font
 from derby.core.theme.tab_bar import configure_tab_widget
 from derby.core.utils.money import format_egp
+from derby.core.utils.screen_refresh import RefreshOnChangeMixin
 from derby.features.auth import permissions
 from derby.features.playstation import ps_service
 from derby.features.playstation.ps_adjust_start_dialog import PsAdjustStartDialog
@@ -253,7 +254,7 @@ class _DeviceCard(QFrame):
             self.state_changed.emit()
 
 
-class PlaystationScreen(QWidget):
+class PlaystationScreen(RefreshOnChangeMixin, QWidget):
     order_opened = Signal(int)
 
     def __init__(self, conn: sqlite3.Connection, user: sqlite3.Row, parent: QWidget = None) -> None:
@@ -268,6 +269,7 @@ class PlaystationScreen(QWidget):
 
         self._build_ui()
         self.reload()
+        self._init_refresh_on_change()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)

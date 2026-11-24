@@ -4,6 +4,7 @@ swaps between the feature screens the current role is allowed to see.
 from __future__ import annotations
 
 import sqlite3
+import sys
 from pathlib import Path
 
 from PySide2.QtCore import Signal
@@ -11,6 +12,7 @@ from PySide2.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLay
 
 from derby.core.db import settings_repo
 from derby.core.i18n import ar
+from derby.core.utils import error_log
 from derby.features.audit.audit_log_screen import AuditLogScreen
 from derby.features.auth import permissions
 from derby.features.closing.closing_banner import ClosingBannerWidget
@@ -188,11 +190,17 @@ class MainWindow(QMainWindow):
         if widget is not None:
             self._content_stack.setCurrentWidget(widget)
             self._sidebar.set_active(key)
-            # These two show live busy/free state that the Cashier screen
-            # (orders) and PlayStation sessions change from elsewhere, so
-            # refresh on every visit rather than only once at construction.
-            if key in ("tables", "playstation"):
-                widget.reload()
+            # Every data screen is built once and then just shown/hidden by
+            # the stack, never rebuilt -- its own `showEvent` (see
+            # RefreshOnChangeMixin) only requeries when something actually
+            # changed while it was hidden. Reloading again here, on every
+            # visit, is a cheap safety net on top of that for anything the
+            # central "data changed" bus (derby.core.events) missed.
+            if hasattr(widget, "reload"):
+                try:
+                    widget.reload()
+                except Exception:
+                    error_log.log_exception(*sys.exc_info())
 
     def _navigate_to_default(self) -> None:
         for key, _label, _icon_name, _phase, _allowed in SECTIONS:
