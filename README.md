@@ -3,11 +3,11 @@
 (لا يوجد كود مصدري أو بيانات كافيه في هذا المستودع -- فقط ملف التحديثات
 ومرفقات الإصدارات.)
 
-## تحميل آخر إصدار (v1.1.0)
+## تحميل آخر إصدار (v1.2.0)
 
-**[تحميل Derby-Setup-1.1.0.exe](https://github.com/Dabash99/derpy_cashier/releases/download/v1.1.0/Derby-Setup-1.1.0.exe)**
+**[تحميل Derby-Setup-1.2.0.exe](https://github.com/Dabash99/derpy_cashier/releases/download/v1.2.0/Derby-Setup-1.2.0.exe)**
 
-بصمة التحقق (SHA-256): `7e03b46feaa28dd9853c715eab297fa4203b5ac484216690d87def17b740ad3f`
+بصمة التحقق (SHA-256): `69be4a266ff4a03736d6e499690879e40dd33582da66f52722241226f9c222ca`
 
 **المتطلبات:** Windows 7 Service Pack 1 (64-bit) أو Windows 10 (64-bit).
 على Windows 7 يلزم تحديث Universal C Runtime (KB2999226) مثبّتًا مسبقًا.
@@ -22,6 +22,7 @@
 
 | الإصدار | التاريخ | الرابط | ملاحظات |
 |---|---|---|---|
+| 1.2.0 | 2026-11-24 | [صفحة الإصدار](https://github.com/Dabash99/derpy_cashier/releases/tag/v1.2.0) | إصدار ديربي 1.2.0 |
 | 1.1.0 | 2026-11-22 | [صفحة الإصدار](https://github.com/Dabash99/derpy_cashier/releases/tag/v1.1.0) | إصدار ديربي 1.1.0 |
 | 1.0.0 | 2026-11-21 | [صفحة الإصدار](https://github.com/Dabash99/derpy_cashier/releases/tag/v1.0.0) | إصدار ديربي 1.0.0 |
 
